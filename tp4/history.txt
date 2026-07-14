@@ -1,0 +1,185 @@
+  1  sudo apt update
+    2  sudo apt install ca-certificates curl gnupg lsb-release -y
+    3  sudo mkdir -p /etc/apt/keyrings
+    4  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    5  sudo chmod a+r /etc/apt/keyrings/docker.gpg
+    6  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    7  sudo apt update
+    8  sudo apt install docker-ce docker-ce-cli containerd.io docker-compose-plugin -y
+    9  sudo usermod -aG docker $USER
+   10  docker --version
+   11  docker compose version
+   12  mkdir hadoop-hive-hue
+   13  cd hadoop-hive-hue
+   14  mkdir -p hue
+   15  nano docker-compose.yml
+   16  cd hue/
+   17  nano hue.ini
+   18  cd ..
+   19  docker compose up -d
+   20  exit
+   21  cd hadoop-hive-hue/
+   22  docker compose up -d
+   23  ls
+   24  rm docker-compose.yml 
+   25  nano docker-compose.yml
+   26  docker compose down -v
+   27  docker compose pull
+   28  docker compose up -d
+   29  docker compose ps
+   30  nano docker-compose.yml 
+   31  rm docker-compose.yml 
+   32  nano docker-compose.yml
+   33  cd hue/
+   34  ls
+   35  nano hue.ini 
+   36  cd ..
+   37  ls
+   38  docker compose down -v --remove-orphans
+   39  docker compose pull
+   40  docker compose up -d
+   41  docker ps
+   42  docker compose up -d
+   43  nano docker-compose.yml
+   44  docker compose up -d
+   45  nano docker-compose.yml
+   46  rm docker-compose.yml 
+   47  nano docker-compose.yml 
+   48  docker compose down -v --remove-orphans
+   49  docker compose up -d
+   50  docker logs datanode --tail=100
+   51  # Ouvrir un shell root directement dans le namenode
+   52  docker exec -it namenode bash
+   53  cd hue/
+   54  rm hue.ini 
+   55  nano hue.init
+   56  ls
+   57  nano hue.ini
+   58  cd ..
+   59  nano docker-compose.yml 
+   60  rm docker-compose.yml 
+   61  nano docker-compose.yml 
+   62  docker compose down -v --remove-orphans
+   63  docker compose up -d
+   64  docker exec -it namenode bash
+   65  nano docker-compose.yml 
+   66  nano hue/hue.ini 
+   67  docker compose down
+   68  docker compose up -d
+   69  docker exec -it namenode bash
+   70  docker logs hive-server2 --tail=30
+   71  rm docker-compose.yml 
+   72  nano docker-compose.yml 
+   73  docker compose down -v --remove-orphans
+   74  docker logs hive-server2 --tail=30
+   75  docker compose up -d
+   76  rm docker-compose.yml 
+   77  nano docker-compose.yml 
+   78  docker compose down -v --remove-orphans
+   79  docker compose up -d
+   80  docker logs hive-server2 --tail=30
+   81  docker logs hive-metastore --tail=100
+   82  nano Dockerfile.hive
+   83  rm docker-compose.yml 
+   84  nano docker-compose.yml 
+   85  docker build -f Dockerfile.hive -t hive-with-postgres:4.2.0 .
+   86  docker compose down -v --remove-orphans
+   87  docker compose up -d
+   88  docker logs hive-metastore --tail=50
+   89  docker logs hive-server2 --tail=30
+   90  docker exec -it namenode bash
+   91  docker logs hive-server2 --tail=30
+   92  nano hue/hue.ini 
+   93  nano Dockerfile.hive 
+   94  nano hue/hue.ini 
+   95  rm hue/hue.ini 
+   96  nano hue/hue.ini 
+   97  docker compose restart hue
+   98  docker exec -it namenode bash
+   99  hdfs dfs -mkdir -p /user/hive/warehouse
+  100  hdfs dfs -chmod -R 1777 /user/hive/warehouse
+  101  hdfs dfs -chown -R hive:hive /user/hive/warehouse
+  102  hdfs dfs -ls /user/hive
+  103  docker exec -it hive-server2 bash
+  104  docker exec -it namenode bash
+  105  docker exec -it hive-server2 bash
+  106  mkdir transactions
+  107  cd transactions/
+  108  wget https://www.kaggle.com/datasets/keyvanhamdi/huge-transactional-dataset/download?datasetVersionNumber=1 -O transactions.zip
+  109  unzip transactions.zip
+  110  sudo apt install unzip
+  111  unzip transactions.zip
+  112  wget https://www.kaggle.com/datasets/keyvanhamdi/huge-transactional-dataset/download?datasetVersionNumber=1 -O transactions.zip
+  113  ls
+  114  unzip transactions.zip
+  115  pip install kaggle
+  116  sudo apt install python3-pip
+  117  pip install kaggle
+  118  mkdir ~/.kaggle
+  119  cd ~/.kaggle
+  120  nano kaggle.json
+  121  chmod 600 ~/.kaggle/kaggle.json
+  122  cd /home/hadoop/hadoop-hive-hue/
+  123  cd transactions/
+  124  kaggle datasets list
+  125  cd ~/.kaggle
+  126  kaggle datasets list
+  127  hadoop@ip-172-31-44-26:~/.kaggle$ kaggle datasets list
+  128  kaggle: command not found
+  129  kaggle --version
+  130  ~/.local/bin/kaggle --version
+  131  echo 'export PATH=$PATH:~/.local/bin' >> ~/.bashrc
+  132  source ~/.bashrc
+  133  kaggle datasets list
+  134  cd /home/hadoop/hadoop-hive-hue/
+  135  cd transactions/
+  136  kaggle datasets download -d keyvanhamdi/huge-transactional-dataset
+  137  unzip huge-transactional-dataset.zip
+  138  ls
+  139  docker exec -it namenode bash
+  140  cd 
+  141  cd hadoop-hive-hue/
+  142  nano docker-compose.yml 
+  143  ls
+  144  docker compose restart namenode
+  145  docker exec -it namenode bash
+  146  docker-compose down
+  147  ls
+  148  docker-compose down
+  149  nano ~/.bashrc
+  150  docker-compose down
+  151  docker compose down
+  152  docker compose up -d
+  153  docker exec -it namenode bash
+  154  clear
+  155  ls
+  156  cd hadoop-hive-hue/
+  157  docker ps
+  158  docker exec -it hive-metastore bash
+  159  cat docker-compose.yml 
+  160  cat hue/hue.ini 
+  161  ls
+  162  cat Dockerfile.hive 
+  163  docker exec -it namenode bash
+  164  nano docker-compose.yml 
+  165  docker-compose down
+  166  docker compose down
+  167  nano docker-compose.yml 
+  168  cat docker-compose.yml 
+  169  docker exec -it hive-metastore bash
+  170  nano docker-compose.yml 
+  171  docker compose down -v
+  172  docker compose up -d
+  173  docker ps
+  174  docker exec -it namenode bash
+  175  docker ps
+  176  docker exec -it hive-server2 bash
+  177  ls
+  178  sudo cp hadoop-hive-hue/ /home/ubuntu/
+  179  sudo cp -r hadoop-hive-hue/ /home/ubuntu/
+  180  ls
+  181  cd hadoop-hive-hue/
+  182  ls
+  183  fe
+  184  ls
+  185  history 

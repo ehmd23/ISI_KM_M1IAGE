@@ -21,6 +21,7 @@
       --code-shell: #2ecc71;
       --code-xml: #5dade2;
       --code-java: #c678dd;
+      --code-python: #3776ab;
       --code-plain: #f5b041;
     }
     * { box-sizing: border-box; }
@@ -102,6 +103,7 @@
     }
     .badge-hadoop { background-color: #e67e22; }
     .badge-java { background-color: #e74c3c; }
+    .badge-python { background-color: #3776ab; }
     .badge-ubuntu { background-color: #27ae60; }
     .badge-aws { background-color: #111827; }
     article { max-width: 100%; }
@@ -229,20 +231,21 @@
     </div>
   </div>
 
-  <div class="subtitle">Cours : Big Data &amp; Analyse de données | Niveau : Licence 3 IAGE</div>
+  <div class="subtitle">Cours : Big Data &amp; Analyse de données | Niveau : DITI 5 — ISI</div>
   <div class="meta-info">
-    Version du document : 1.0 — Hadoop <span class="badge badge-hadoop">3.4.3</span>
+    Version du document : 1.1 — Hadoop <span class="badge badge-hadoop">3.4.3</span>
     Java <span class="badge badge-java">21</span>
+    Python <span class="badge badge-python">3</span>
     Ubuntu <span class="badge badge-ubuntu">24.04 LTS</span>
     AWS <span class="badge badge-aws">EC2</span>
   </div>
 
-  <div class="box box-info"><strong>Objectif du TP :</strong> déployer un cluster Hadoop distribué dans le cloud AWS avec 1 NameNode, 3 DataNodes, HDFS, YARN et un job MapReduce de calcul du chiffre d’affaires par ville.</div>
+  <div class="box box-info"><strong>Objectif du TP :</strong> déployer un cluster Hadoop distribué dans le cloud AWS avec 1 NameNode, 3 DataNodes, HDFS, YARN et un job MapReduce de calcul du chiffre d’affaires par ville (Java et Python).</div>
 
   <article>
     <h2>TP : Déploiement d’un cluster Hadoop 4 nœuds sur AWS EC2</h2>
 <p><strong>Objectif</strong> : Installer un cluster Hadoop complet (NameNode + 3 DataNodes) avec YARN et exécuter un job MapReduce de calcul du Chiffre d’Affaires par ville.</p>
-<p><strong>Technologies</strong> : Hadoop 3.4.3, Java 21, Ubuntu 24.04 LTS</p>
+<p><strong>Technologies</strong> : Hadoop 3.4.3, Java 21, Python 3, Ubuntu 24.04 LTS</p>
 <hr />
 <h2>Étape 0 : Lancement des instances EC2 et Security Group</h2>
 <p>1. Dans la console AWS EC2, lancez <strong>4 instances</strong> avec les paramètres suivants :<br />
@@ -614,6 +617,24 @@ hadoop jar target/ca-par-ville-1.0-SNAPSHOT.jar sn.ehmd.TotalSalesByCity /input/
 
 hdfs dfs -cat /output-ca/part-r-00000  
 </code></pre>
+
+<h3>Variante Python — Hadoop Streaming</h3>
+<p>Sur AWS, réutilisez les scripts du dépôt (<code>src/main/python/</code>) — même logique que dans le TP2.</p>
+<pre><code class="language-bash"># Sur le master, avec Python 3 installé sur tous les nœuds
+chmod +x total_sales_by_city_mapper.py total_sales_by_city_reducer.py
+
+hdfs dfs -rm -r -f /output-ca-py
+
+hadoop jar $HADOOP_HOME/share/hadoop/tools/lib/hadoop-streaming-*.jar \
+  -files total_sales_by_city_mapper.py,total_sales_by_city_reducer.py \
+  -mapper "python3 total_sales_by_city_mapper.py" \
+  -reducer "python3 total_sales_by_city_reducer.py" \
+  -input /input/purchases.txt \
+  -output /output-ca-py
+
+hdfs dfs -cat /output-ca-py/part-*
+</code></pre>
+<p>Le résultat Python doit correspondre à la sortie Java (<code>/output-ca</code>).</p>
 <hr />
 <p><strong>Fin du TP</strong></p>
 <p>Commandes utiles :<br />

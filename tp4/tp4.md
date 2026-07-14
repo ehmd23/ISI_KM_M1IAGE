@@ -1,7 +1,7 @@
 # TP4 — Apache Hive sur HDFS avec Hue (Docker)
 
 **Cours :** Big Data et analyse de données  
-**Niveau :** Licence 3 IAGE — ISI  
+**Niveau :** DITI 5 (Diplôme d'Ingénieur en Techniques Informatiques) — ISI  
 **Année universitaire :** 2025-2026  
 **Version du document :** 1.3
 
@@ -610,7 +610,7 @@ LIMIT 10;
 
 ### 9.4 Bonus — Comparaison avec le job MapReduce
 
-Le job Java [`TotalSalesByCategory.java`](../src/main/java/sn/ehmd/TotalSalesByCategory.java) agrège la somme des montants par catégorie. Comparez son résultat avec la requête HQL de la section 9.3.2.
+Le job Java [`TotalSalesByCategory.java`](../src/main/java/sn/ehmd/TotalSalesByCategory.java) (ou son équivalent Python Streaming dans [`src/main/python/`](../src/main/python/)) agrège la somme des montants par catégorie. Comparez son résultat avec la requête HQL de la section 9.3.2.
 
 ---
 
