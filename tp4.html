@@ -220,13 +220,31 @@
     .box-info { background-color: #e7f3fe; border-color: #2196f3; color: #0c5460; }
     .box-warn { background-color: #fff8e1; border-color: #f39c12; color: #7a5a00; }
     .mermaid-container {
-      background: #f8fbff;
-      border: 1px solid var(--border);
+      background: #1e1e1e;
+      border: 1px solid var(--code-border);
       border-radius: 8px;
       padding: 16px;
       margin: 18px 0;
       text-align: center;
       overflow-x: auto;
+    }
+    .mermaid-container pre.mermaid {
+      background: transparent;
+      border: none;
+      color: #e5e7eb;
+      text-align: center;
+    }
+    /* Liens / flèches visibles sur fond noir */
+    .mermaid-container .flowchart-link {
+      stroke: #7dd3fc !important;
+    }
+    .mermaid-container marker path {
+      fill: #7dd3fc !important;
+      stroke: #7dd3fc !important;
+    }
+    .mermaid-container .edgeLabel {
+      color: #e5e7eb !important;
+      background-color: #1e1e1e !important;
     }
     .footer {
       margin-top: 40px;
@@ -994,7 +1012,24 @@ docker logs hive-server2 --tail=80</code></pre>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <script>
     if (window.mermaid) {
-      mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: 'dark',
+        securityLevel: 'loose',
+        themeVariables: {
+          lineColor: '#7dd3fc',
+          primaryTextColor: '#e5e7eb',
+          secondaryTextColor: '#e5e7eb',
+          tertiaryTextColor: '#e5e7eb',
+          textColor: '#e5e7eb',
+          mainBkg: '#2b2b2b',
+          nodeBorder: '#7dd3fc',
+          clusterBkg: '#252526',
+          clusterBorder: '#5a5a5a',
+          titleColor: '#e5e7eb',
+          edgeLabelBackground: '#1e1e1e'
+        }
+      });
     }
   </script>
 </body>
