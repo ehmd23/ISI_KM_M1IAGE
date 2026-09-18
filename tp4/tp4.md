@@ -1,7 +1,7 @@
 # TP4 — Apache Hive sur HDFS avec Hue (Docker)
 
 **Cours :** Big Data et analyse de données  
-**Niveau :** DITI 5 (Diplôme d'Ingénieur en Techniques Informatiques) — ISI  
+**Niveau :** Master 2 - Réseaux Informatiques — ISI  
 **Année universitaire :** 2025-2026  
 **Version du document :** 1.3
 
@@ -655,4 +655,4 @@ Un court rapport (PDF ou Markdown) contenant :
 
 ---
 
-*ISI — Institut supérieur d’informatique — Big Data et analyse de données — TP n°4*
+*ISI — Institut supérieur d’informatique — Master 2 — Réseaux Informatiques — Big Data et analyse de données — TP n°4*
