@@ -438,7 +438,8 @@ readlink -f $(which java)
 
     <h3>3.2 Création de l'utilisateur hadoop</h3>
     <p>Il est recommandé de créer un utilisateur système dédié pour isoler l'installation Hadoop.</p>
-    <pre>sudo useradd -m -s /bin/bash hadoop
+    <pre>sudo adduser --disabled-password --gecos "" hadoop
+sudo usermod -aG sudo hadoop
 sudo passwd hadoop
 # Entrez un mot de passe simple (ex: hadoop) pour le TP
 sudo usermod -aG sudo hadoop
@@ -562,6 +563,26 @@ sudo chown -R hadoop:hadoop /home/hadoop/hdfs/
         &lt;name&gt;dfs.data.dir&lt;/name&gt;
         &lt;value&gt;file:///home/hadoop/hdfs/datanode&lt;/value&gt;
     &lt;/property&gt;
+    &lt;property&gt;
+    &lt;name&gt;dfs.blocksize&lt;/name&gt;
+    &lt;value&gt;268435456&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.namenode.rpc-bind-host&lt;/name&gt;
+      &lt;value&gt;0.0.0.0&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.namenode.http-bind-host&lt;/name&gt;
+      &lt;value&gt;0.0.0.0&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.datanode.address&lt;/name&gt;
+      &lt;value&gt;0.0.0.0:9866&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.namenode.datanode.registration.ip-hostname-check&lt;/name&gt;
+      &lt;value&gt;false&lt;/value&gt;
+    &lt;/property&gt;
 &lt;/configuration&gt;
 </pre>
 
@@ -569,13 +590,13 @@ sudo chown -R hadoop:hadoop /home/hadoop/hdfs/
     <p>Indique à MapReduce d'utiliser YARN comme gestionnaire de ressources.</p>
     <p><code>nano $HADOOP_HOME/etc/hadoop/mapred-site.xml</code></p>
     <pre class="xml">&lt;configuration&gt;
-    &lt;property&gt;
-        &lt;name&gt;mapreduce.framework.name&lt;/name&gt;
-        &lt;value&gt;yarn&lt;/value&gt;
+      &lt;property&gt;
+      &lt;name&gt;mapreduce.framework.name&lt;/name&gt;
+      &lt;value&gt;yarn&lt;/value&gt;
     &lt;/property&gt;
     &lt;property&gt;
-        &lt;name&gt;mapreduce.application.classpath&lt;/name&gt;
-        &lt;value&gt;$HADOOP_MAPRED_HOME/share/hadoop/mapreduce/*:$HADOOP_MAPRED_HOME/share/hadoop/mapreduce/lib/*&lt;/value&gt;
+      &lt;name&gt;mapreduce.application.classpath&lt;/name&gt;
+      &lt;value&gt;$HADOOP_MAPRED_HOME/share/hadoop/mapreduce/*:$HADOOP_MAPRED_HOME/share/hadoop/mapreduce/lib/*&lt;/value&gt;
     &lt;/property&gt;
 &lt;/configuration&gt;
 </pre>
@@ -584,13 +605,29 @@ sudo chown -R hadoop:hadoop /home/hadoop/hdfs/
     <p>Active le service de shuffle nécessaire pour MapReduce.</p>
     <p><code>nano $HADOOP_HOME/etc/hadoop/yarn-site.xml</code></p>
     <pre class="xml">&lt;configuration&gt;
-    &lt;property&gt;
-        &lt;name&gt;yarn.nodemanager.aux-services&lt;/name&gt;
-        &lt;value&gt;mapreduce_shuffle&lt;/value&gt;
+      &lt;property&gt;
+      &lt;name&gt;yarn.resourcemanager.hostname&lt;/name&gt;
+      &lt;value&gt;localhost&lt;/value&gt;
     &lt;/property&gt;
     &lt;property&gt;
-        &lt;name&gt;yarn.nodemanager.env-whitelist&lt;/name&gt;
-        &lt;value&gt;JAVA_HOME,HADOOP_COMMON_HOME,HADOOP_HDFS_HOME,HADOOP_CONF_DIR,CLASSPATH_PREPEND_DISTCACHE,HADOOP_YARN_HOME,HADOOP_HOME,PATH,LANG,TZ,HADOOP_MAPRED_HOME&lt;/value&gt;
+      &lt;name&gt;yarn.resourcemanager.bind-host&lt;/name&gt;
+      &lt;value&gt;0.0.0.0&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+      &lt;name&gt;yarn.nodemanager.aux-services&lt;/name&gt;
+      &lt;value&gt;mapreduce_shuffle&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+      &lt;name&gt;yarn.nodemanager.aux-services.mapreduce_shuffle.class&lt;/name&gt;
+      &lt;value&gt;org.apache.hadoop.mapred.ShuffleHandler&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+      &lt;name&gt;yarn.nodemanager.resource.memory-mb&lt;/name&gt;
+      &lt;value&gt;4096&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+      &lt;name&gt;yarn.nodemanager.env-whitelist&lt;/name&gt;
+      &lt;value&gt;JAVA_HOME,HADOOP_COMMON_HOME,HADOOP_HDFS_HOME,HADOOP_CONF_DIR,CLASSPATH_PREPEND_DISTCACHE,HADOOP_YARN_HOME,HADOOP_HOME,PATH,LANG,TZ,HADOOP_MAPRED_HOME&lt;/value&gt;
     &lt;/property&gt;
 &lt;/configuration&gt;
 </pre>

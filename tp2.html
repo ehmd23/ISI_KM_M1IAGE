@@ -202,6 +202,52 @@
       font-weight: 600;
     }
     .top-nav a.secondary { background: #2c5282; }
+    .mermaid-container {
+      background: #1e1e1e;
+      border: 1px solid var(--code-border);
+      border-radius: 8px;
+      padding: 28px 24px 24px;
+      margin: 18px 0;
+      text-align: center;
+      overflow-x: auto;
+      min-height: 480px;
+    }
+    .mermaid-container svg {
+      max-width: 100%;
+      height: auto;
+    }
+    .mermaid-container .cluster-label {
+      color: #e5e7eb !important;
+    }
+    .mermaid-container pre.mermaid {
+      background: transparent;
+      border: none;
+      color: #e5e7eb;
+      text-align: center;
+      min-width: 720px;
+    }
+    .mermaid-container .flowchart-link {
+      stroke: #7dd3fc !important;
+    }
+    .mermaid-container marker path {
+      fill: #7dd3fc !important;
+      stroke: #7dd3fc !important;
+    }
+    .mermaid-container .edgeLabel {
+      color: #e5e7eb !important;
+      background-color: #1e1e1e !important;
+      padding: 2px 6px !important;
+    }
+    .mermaid-container .cluster rect {
+      rx: 8px;
+      ry: 8px;
+    }
+    .archi-legend {
+      font-size: 10pt;
+      color: #374151;
+      margin: 8px 0 18px;
+      line-height: 1.55;
+    }
   </style>
 </head>
 <body>
@@ -283,6 +329,57 @@
 
   <h3>1.3 Réseau VirtualBox</h3>
   <p>Créez un adaptateur <strong>Host-only</strong> depuis <code>Fichier → Outils → Gestionnaire de réseaux hôte</code>, puis créez <code>vboxnet0</code> et <strong>désactivez le serveur DHCP</strong>.</p>
+
+  <h3>1.4 Architecture de l’environnement</h3>
+  <p>
+    Le cluster à déployer comporte <strong>4 machines</strong> sur le réseau host-only
+    <code>192.168.56.0/24</code> : le nœud <code>master</code> (<code>192.168.56.10</code>) héberge le
+    <strong>NameNode</strong> et le <strong>ResourceManager</strong> ; chaque worker
+    (<code>datanode1</code> à <code>datanode3</code>) héberge un <strong>DataNode</strong> et un
+    <strong>NodeManager</strong>. La carte NAT de chaque VM sert uniquement à l’accès Internet (téléchargements) et n’apparaît pas comme lien inter-machines.
+  </p>
+  <p class="archi-legend" style="margin-bottom: 6px;"><strong>Réseau inter-machines :</strong> host-only <code>192.168.56.0/24</code> (<code>vboxnet0</code>).</p>
+  <div class="mermaid-container">
+    <pre class="mermaid">
+%%{init: {"flowchart": {"nodeSpacing": 80, "rankSpacing": 120, "padding": 40, "htmlLabels": true, "curve": "linear"}}}%%
+flowchart TB
+  subgraph masterNode ["master 192.168.56.10"]
+    direction LR
+    NN["NameNode"]
+    RM["ResourceManager"]
+  end
+  subgraph worker1 ["datanode1 192.168.56.11"]
+    direction LR
+    DN1["DataNode"]
+    NM1["NodeManager"]
+  end
+  subgraph worker2 ["datanode2 192.168.56.12"]
+    direction LR
+    DN2["DataNode"]
+    NM2["NodeManager"]
+  end
+  subgraph worker3 ["datanode3 192.168.56.13"]
+    direction LR
+    DN3["DataNode"]
+    NM3["NodeManager"]
+  end
+  NN --&gt;|HDFS| DN1
+  NN --&gt;|HDFS| DN2
+  NN --&gt;|HDFS| DN3
+  RM --&gt;|YARN| NM1
+  RM --&gt;|YARN| NM2
+  RM --&gt;|YARN| NM3
+  DN1 -.->|repl.| DN2
+  DN2 -.->|repl.| DN3
+    </pre>
+  </div>
+  <p class="archi-legend">
+    <strong>Légende :</strong> HDFS = RPC / heartbeats vers <code>hdfs://master:8020</code> ;
+    YARN = allocation des ressources (<code>yarn.resourcemanager.hostname=master</code>) ;
+    repl. = réplication des blocs entre DataNodes (facteur 3).
+    SSH sans mot de passe depuis <code>master</code> vers chaque worker (section 6) emprunte le même réseau host-only.
+    Carte 1 = NAT (Internet) ; carte 2 = host-only (cluster).
+  </p>
 
   <h2>2. Configuration réseau et hostnames</h2>
   <p>Les opérations de cette section doivent être exécutées sur <strong>les 4 machines virtuelles</strong>.</p>
@@ -747,5 +844,36 @@ hdfs dfs -cat /output-ca-py/part-*</pre>
   </div>
 
   <div class="footer">ISI — Institut Supérieur d'Informatique | Master 2 — Réseaux Informatiques | Cours : Big Data &amp; Analyse de données | TP N°2 — Année universitaire 2025-2026</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    if (window.mermaid) {
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: 'dark',
+        securityLevel: 'loose',
+        flowchart: {
+          nodeSpacing: 80,
+          rankSpacing: 120,
+          padding: 40,
+          htmlLabels: true,
+          curve: 'linear'
+        },
+        themeVariables: {
+          lineColor: '#7dd3fc',
+          primaryTextColor: '#e5e7eb',
+          secondaryTextColor: '#e5e7eb',
+          tertiaryTextColor: '#e5e7eb',
+          textColor: '#e5e7eb',
+          mainBkg: '#2b2b2b',
+          nodeBorder: '#7dd3fc',
+          clusterBkg: '#252526',
+          clusterBorder: '#5a5a5a',
+          titleColor: '#e5e7eb',
+          edgeLabelBackground: '#1e1e1e'
+        }
+      });
+    }
+  </script>
 </body>
 </html>
