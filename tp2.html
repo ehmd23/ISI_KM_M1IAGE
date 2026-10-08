@@ -2,289 +2,43 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>TP2 - Déploiement d’un cluster Hadoop 4 nœuds sur VirtualBox - ISI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TP2 — Cluster Hadoop 4 nœuds sur VirtualBox — ISI M1 IAGE</title>
+  <meta name="description" content="TP2 du module Big Data (ISI, Master 1 IAGE) : cluster Hadoop de 4 nœuds sur VirtualBox et job MapReduce du chiffre d'affaires par ville.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <style>
-    @page { size: A4 portrait; margin: 2.5cm; }
-    :root {
-      --code-bg: #2b2b2b;
-      --code-fg: #a9b7c6;
-      --code-border: #3c3f41;
-      --code-shell: #2ecc71;
-      --code-xml: #5dade2;
-      --code-java: #c678dd;
-      --code-python: #3776ab;
-    }
-    body {
-      margin: 0 auto;
-      padding: 0 2.5cm;
-      background-color: #ffffff;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      font-size: 10.5pt;
-      line-height: 1.45;
-      color: #000000;
-      box-sizing: border-box;
-    }
-    h1 {
-      font-size: 18pt;
-      color: #1a3a5c;
-      text-align: center;
-      margin-top: 20px;
-      margin-bottom: 10px;
-      text-transform: uppercase;
-      border-bottom: 2px solid #1a3a5c;
-      padding-bottom: 10px;
-    }
-    .subtitle {
-      text-align: center;
-      font-size: 12pt;
-      color: #444;
-      margin-bottom: 5px;
-      font-weight: bold;
-    }
-    .meta-info {
-      text-align: center;
-      font-size: 10pt;
-      color: #666;
-      margin-bottom: 32px;
-      font-style: italic;
-    }
-    h2 {
-      font-size: 14pt;
-      color: #1a3a5c;
-      border-bottom: 1px solid #ccc;
-      padding-bottom: 5px;
-      margin-top: 30px;
-      margin-bottom: 15px;
-    }
-    h3 {
-      font-size: 12pt;
-      color: #2c5282;
-      margin-top: 20px;
-      margin-bottom: 10px;
-    }
-    .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 0.85em;
-      font-weight: bold;
-      color: white;
-      vertical-align: middle;
-      margin-left: 5px;
-    }
-    .badge-hadoop { background-color: #e67e22; }
-    .badge-java { background-color: #e74c3c; }
-    .badge-python { background-color: #3776ab; }
-    .badge-ubuntu { background-color: #27ae60; }
-    /* Blocs de code harmonisés (shell / XML / Java / Python — lisibilité, bordures colorées) */
-    pre {
-      background-color: var(--code-bg);
-      color: var(--code-fg);
-      border: 1px solid var(--code-border);
-      border-left: 4px solid var(--code-shell);
-      border-radius: 4px;
-      padding: 12px;
-      overflow-x: auto;
-      font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
-      font-size: 9pt;
-      line-height: 1.55;
-      tab-size: 4;
-      margin: 10px 0;
-      white-space: pre-wrap;
-    }
-    pre code {
-      background: transparent;
-      color: inherit;
-      padding: 0;
-      border: 0;
-      font-family: inherit;
-      font-size: inherit;
-    }
-    pre.xml { border-left-color: var(--code-xml); }
-    pre.xml .xml-tag { color: #e8bf6a; }
-    pre.xml .xml-attr { color: #bababa; }
-    pre.xml .xml-str { color: #6a8759; }
-    pre.xml .xml-com { color: #7a7a7a; font-style: italic; }
-    pre.java { border-left-color: var(--code-java); }
-    pre.java .ij-kw { color: #cc7832; }
-    pre.java .ij-cls { color: #4ec9b0; }
-    pre.java .ij-met { color: #ffc66d; }
-    pre.java .ij-var { color: #9876aa; }
-    pre.java .ij-str { color: #6a8759; }
-    pre.java .ij-num { color: #6897bb; }
-    pre.python { border-left-color: var(--code-python); }
-    pre.python .py-kw { color: #cc7832; }
-    pre.python .py-str { color: #6a8759; }
-    pre.python .py-com { color: #808080; font-style: italic; }
-    code { font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 15px 0;
-      font-size: 10pt;
-    }
-    th {
-      background-color: #1a3a5c;
-      color: white;
-      padding: 8px;
-      text-align: left;
-      border: 1px solid #ddd;
-    }
-    td {
-      padding: 8px;
-      border: 1px solid #ddd;
-      vertical-align: top;
-    }
-    tr:nth-child(even) { background-color: #f2f2f2; }
-    .box {
-      padding: 10px 15px;
-      margin: 15px 0;
-      border-left: 5px solid;
-      border-radius: 4px;
-    }
-    .box-info {
-      background-color: #e7f3fe;
-      border-color: #2196f3;
-      color: #0c5460;
-    }
-    .box-warning {
-      background-color: #fff3cd;
-      border-color: #ff9800;
-      color: #856404;
-    }
-    .box-success {
-      background-color: #d4edda;
-      border-color: #28a745;
-      color: #155724;
-    }
-    .footer {
-      margin-top: 50px;
-      padding-top: 10px;
-      border-top: 1px solid #ccc;
-      font-size: 9pt;
-      text-align: center;
-      color: #666;
-    }
-    ul, ol { margin-top: 5px; margin-bottom: 10px; padding-left: 25px; }
-    li { margin-bottom: 5px; }
-    .cover-line {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 20px;
-    }
-    .logo { width: 100px; height: 100px; object-fit: contain; }
-    .top-nav {
-      position: sticky;
-      top: 0;
-      z-index: 1000;
-      background: #f8fbff;
-      border: 1px solid #d8e3f0;
-      border-radius: 10px;
-      padding: 12px 16px;
-      margin: 18px 0 24px 0;
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: center;
-    }
-    .top-nav a {
-      text-decoration: none;
-      background: #1a3a5c;
-      color: white;
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-size: 10pt;
-      font-weight: 600;
-    }
-    .top-nav a.secondary { background: #2c5282; }
-    .mermaid-container {
-      background: #1e1e1e;
-      border: 1px solid var(--code-border);
-      border-radius: 8px;
-      padding: 28px 24px 24px;
-      margin: 18px 0;
-      text-align: center;
-      overflow-x: auto;
-      min-height: 480px;
-    }
-    .mermaid-container svg {
-      max-width: 100%;
-      height: auto;
-    }
-    .mermaid-container .cluster-label {
-      color: #e5e7eb !important;
-    }
-    .mermaid-container pre.mermaid {
-      background: transparent;
-      border: none;
-      color: #e5e7eb;
-      text-align: center;
-      min-width: 720px;
-    }
-    .mermaid-container .flowchart-link {
-      stroke: #7dd3fc !important;
-    }
-    .mermaid-container marker path {
-      fill: #7dd3fc !important;
-      stroke: #7dd3fc !important;
-    }
-    .mermaid-container .edgeLabel {
-      color: #e5e7eb !important;
-      background-color: #1e1e1e !important;
-      padding: 2px 6px !important;
-    }
-    .mermaid-container .cluster rect {
-      rx: 8px;
-      ry: 8px;
-    }
-    .archi-legend {
-      font-size: 10pt;
-      color: #374151;
-      margin: 8px 0 18px;
-      line-height: 1.55;
-    }
-  </style>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/tp.css">
 </head>
 <body>
-  <div class="top-nav">
-    <a href="index.html">Accueil</a>
-    <a class="secondary" href="tp1.html">TP1</a>
-    <a class="secondary" href="tp2.html">TP2</a>
-    <a class="secondary" href="tp3.html">TP3</a>
-    <a class="secondary" href="tp4.html">TP4</a>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html"><img src="logo.jpg" alt="Logo ISI"><span>Big Data — TP<small>ISI · Master 1 IAGE · 2026-2027</small></span></a>
+    <nav class="nav" aria-label="Navigation des TP">
+      <a href="index.html">Accueil</a>
+      <a href="tp1.html">TP1</a>
+      <a href="tp2.html">TP2</a>
+      <a href="tp3.html">TP3</a>
+      <a href="tp4.html">TP4</a>
+    </nav>
   </div>
-
-  <div class="cover-line">
-    <div class="logo-container">
-      <img src="logo.jpg" alt="Logo ISI" class="logo">
-    </div>
-
-    <h1>
-      Travaux Pratiques N°2<br>
-      Déploiement d’un cluster Apache Hadoop<br>
-      4 nœuds sur VirtualBox
-    </h1>
-
+</header>
+<header class="doc-hero">
+  <div class="doc-hero-inner">
+    <div class="logo-tile"><img src="logo.jpg" alt="Logo ISI"></div>
     <div>
-      Année universitaire<br>
-      <strong>2025 - 2026</strong>
+      <p class="eyebrow">Travaux pratiques n°2 · Big Data &amp; Analyse de données</p>
+      <h1>Déployer un cluster Hadoop de 4 nœuds sur VirtualBox</h1>
+      <p class="lead">Passer d'une machine à un vrai cluster (1 master + 3 workers), puis calculer le chiffre d'affaires par ville avec MapReduce, en Java et en Python.</p>
+      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Hadoop 3.4.3</span><span class="chip">Java 21</span><span class="chip">Python 3</span><span class="chip">Ubuntu 24.04 LTS</span><span class="chip">Version 2.0 · Octobre 2026</span></div>
     </div>
   </div>
-
-  <div class="subtitle">Cours : Big Data &amp; Analyse de données | Niveau : Master 2 — Réseaux Informatiques — ISI</div>
-  <div class="meta-info">
-    Version du document : 1.1 — Hadoop <span class="badge badge-hadoop">3.4.3</span>
-    Java <span class="badge badge-java">21</span>
-    Python <span class="badge badge-python">3</span>
-    Ubuntu <span class="badge badge-ubuntu">24.04 LTS</span>
-  </div>
-
-  <h2>Introduction</h2>
+</header>
+<section class="brief" aria-label="Fiche du TP"><div class="card"><h3>Objectif</h3><p>Un cluster de 4 VM avec HDFS (réplication ×3) et YARN, validé par un job MapReduce.</p></div><div class="card"><h3>Lien avec le cours</h3><p>Chapitres 2 et 3 (maître / travailleurs, réplication) et chapitre 4 (MapReduce).</p></div><div class="card metier"><h3>Enjeu métier (IAGE)</h3><p>Produire des indicateurs de gestion : chiffre d'affaires par ville, par catégorie et par moyen de paiement.</p></div></section>
+<div class="doc-layout">
+  <nav class="toc card" aria-label="Sommaire"><h2>Sommaire</h2><ol></ol></nav>
+  <main class="doc">
+<h2 id="introduction">Introduction</h2>
   <p>
     Dans ce TP, l’objectif est de déployer un <strong>cluster Hadoop distribué de 4 nœuds</strong> composé d’un
     <strong>NameNode</strong> et de <strong>3 DataNodes</strong> à l’aide de <strong>VirtualBox</strong>.
@@ -299,8 +53,7 @@
     <strong>chiffre d’affaires total par ville</strong>
     (en <strong>Java</strong> et en <strong>Python</strong> via Hadoop Streaming).
   </div>
-
-  <h2>1. Environnement de travail et prérequis</h2>
+<h2 id="1-environnement-de-travail-et-prerequis">1. Environnement de travail et prérequis</h2>
   <h3>1.1 Technologies utilisées</h3>
   <table>
     <thead><tr><th>Élément</th><th>Valeur</th></tr></thead>
@@ -380,13 +133,12 @@ flowchart TB
     SSH sans mot de passe depuis <code>master</code> vers chaque worker (section 6) emprunte le même réseau host-only.
     Carte 1 = NAT (Internet) ; carte 2 = host-only (cluster).
   </p>
-
-  <h2>2. Configuration réseau et hostnames</h2>
+<h2 id="2-configuration-reseau-et-hostnames">2. Configuration réseau et hostnames</h2>
   <p>Les opérations de cette section doivent être exécutées sur <strong>les 4 machines virtuelles</strong>.</p>
 
   <h3>2.1 Configuration des adresses IP</h3>
   <pre>sudo nano /etc/netplan/01-netcfg.yaml</pre>
-  <pre class="xml">network:
+  <pre class="yaml">network:
   version: 2
   ethernets:
     enp0s3:
@@ -413,14 +165,13 @@ sudo hostnamectl set-hostname datanode3     # Sur datanode3</pre>
 192.168.56.12   datanode2
 192.168.56.13   datanode3
 127.0.0.1       localhost</pre>
-
-  <h2>3. Création de l’utilisateur Hadoop</h2>
+<h2 id="3-creation-de-l-utilisateur-hadoop">3. Création de l’utilisateur Hadoop</h2>
+  <div class="box box-info"><strong>Sur les 4 VM :</strong> les sections 3, 4, 5 et 8 sont à exécuter sur <strong>chaque</strong> machine (master et les trois workers). Les sections 6, 7, 9 et 10 se font sur <strong>master</strong> uniquement.</div>
   <pre>sudo adduser --disabled-password --gecos "" hadoop
 sudo usermod -aG sudo hadoop
 sudo passwd hadoop
 su - hadoop</pre>
-
-  <h2>4. Installation de Java et Hadoop</h2>
+<h2 id="4-installation-de-java-et-hadoop">4. Installation de Java et Hadoop</h2>
   <pre>sudo apt update && sudo apt install openjdk-21-jdk -y
 
 cd ~
@@ -428,8 +179,7 @@ wget https://archive.apache.org/dist/hadoop/common/hadoop-3.4.3/hadoop-3.4.3.tar
 tar -xzf hadoop-3.4.3.tar.gz
 sudo mv hadoop-3.4.3 /opt/hadoop
 sudo chown -R hadoop:hadoop /opt/hadoop</pre>
-
-  <h2>5. Variables d’environnement</h2>
+<h2 id="5-variables-d-environnement">5. Variables d’environnement</h2>
   <pre>nano ~/.bashrc</pre>
   <pre>export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
 export HADOOP_HOME=/opt/hadoop
@@ -437,16 +187,16 @@ export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
 export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
 export HADOOP_OPTS="-Djava.library.path=$HADOOP_HOME/lib/native"</pre>
   <pre>source ~/.bashrc</pre>
-
-  <h2>6. Configuration SSH sans mot de passe</h2>
+<h2 id="6-configuration-ssh-sans-mot-de-passe">6. Configuration SSH sans mot de passe</h2>
+  <p>Sur <strong>master</strong>, en tant qu’utilisateur <code>hadoop</code>. La clé est aussi copiée vers master lui-même : <code>start-dfs.sh</code> s’y connecte en SSH pour lancer le NameNode et le SecondaryNameNode.</p>
   <pre>ssh-keygen -t rsa -P "" -f ~/.ssh/id_rsa
 
+ssh-copy-id hadoop@master
 ssh-copy-id hadoop@datanode1
 ssh-copy-id hadoop@datanode2
 ssh-copy-id hadoop@datanode3</pre>
   <pre>ssh datanode1</pre>
-
-  <h2>7. Configuration Hadoop</h2>
+<h2 id="7-configuration-hadoop">7. Configuration Hadoop</h2>
   <pre>cd $HADOOP_HOME/etc/hadoop</pre>
 
   <h3>7.1 Fichier hadoop-env.sh</h3>
@@ -477,10 +227,6 @@ export HADOOP_LOG_DIR=/tmp/hadoop-logs</pre>
   &lt;property&gt;
     &lt;name&gt;dfs.datanode.data.dir&lt;/name&gt;
     &lt;value&gt;file:///hadoop/dfs/data&lt;/value&gt;
-  &lt;/property&gt;
-  &lt;property&gt;
-    &lt;name&gt;dfs.blocksize&lt;/name&gt;
-    &lt;value&gt;268435456&lt;/value&gt;
   &lt;/property&gt;
   &lt;property&gt;
     &lt;name&gt;dfs.namenode.rpc-bind-host&lt;/name&gt;
@@ -521,13 +267,19 @@ export HADOOP_LOG_DIR=/tmp/hadoop-logs</pre>
   &lt;/property&gt;
   &lt;property&gt;
     &lt;name&gt;yarn.nodemanager.resource.memory-mb&lt;/name&gt;
-    &lt;value&gt;4096&lt;/value&gt;
+    &lt;value&gt;1536&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;name&gt;yarn.scheduler.maximum-allocation-mb&lt;/name&gt;
+    &lt;value&gt;1536&lt;/value&gt;
   &lt;/property&gt;
   &lt;property&gt;
     &lt;name&gt;yarn.nodemanager.env-whitelist&lt;/name&gt;
     &lt;value&gt;JAVA_HOME,HADOOP_COMMON_HOME,HADOOP_HDFS_HOME,HADOOP_CONF_DIR,CLASSPATH_PREPEND_DISTCACHE,HADOOP_YARN_HOME,HADOOP_HOME,PATH,LANG,TZ,HADOOP_MAPRED_HOME&lt;/value&gt;
   &lt;/property&gt;
 &lt;/configuration&gt;</pre>
+
+  <div class="box box-info"><strong>Mémoire YARN :</strong> chaque VM n’a que 2 Go de RAM. On déclare donc 1 536 Mo utilisables par YARN (et non 4 096 Mo, que la VM ne possède pas), en laissant le reste au système et aux démons Hadoop.</div>
 
   <h3>7.5 Fichier mapred-site.xml</h3>
   <pre class="xml">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
@@ -551,26 +303,24 @@ datanode3</pre>
   <pre>for host in datanode1 datanode2 datanode3; do
   scp hadoop-env.sh core-site.xml hdfs-site.xml yarn-site.xml mapred-site.xml workers hadoop@$host:$HADOOP_CONF_DIR/
 done</pre>
-
-  <h2>8. Création des répertoires Hadoop</h2>
-  <pre>mkdir -p /hadoop/dfs/name /hadoop/dfs/data /tmp/hadoop-pids /tmp/hadoop-logs
+<h2 id="8-creation-des-repertoires-hadoop">8. Création des répertoires Hadoop</h2>
+  <p>Sur les <strong>4 VM</strong> (le dossier <code>/hadoop</code> est à la racine : il faut <code>sudo</code> pour le créer).</p>
+  <pre>sudo mkdir -p /hadoop/dfs/name /hadoop/dfs/data /tmp/hadoop-pids /tmp/hadoop-logs
 sudo chown -R hadoop:hadoop /hadoop /tmp/hadoop-*</pre>
-
-  <h2>9. Démarrage du cluster</h2>
+<h2 id="9-demarrage-du-cluster">9. Démarrage du cluster</h2>
+  <p>Sur <strong>master</strong> uniquement.</p>
   <pre>hdfs namenode -format
 start-dfs.sh
 start-yarn.sh</pre>
   <div class="box box-warning"><strong>Attention :</strong> le formatage du NameNode ne doit être réalisé qu’au moment de l’initialisation.</div>
-
-  <h2>10. Vérification</h2>
+<h2 id="10-verification">10. Vérification</h2>
   <pre>jps
 hdfs dfsadmin -report</pre>
   <ul>
     <li><strong>NameNode :</strong> <a href="http://192.168.56.10:9870">http://192.168.56.10:9870</a></li>
     <li><strong>YARN :</strong> <a href="http://192.168.56.10:8088">http://192.168.56.10:8088</a></li>
   </ul>
-
-  <h2>11. Job MapReduce — Chiffre d’Affaires total par ville</h2>
+<h2 id="11-job-mapreduce-chiffre-d-affaires-total-par-ville">11. Job MapReduce — Chiffre d’Affaires total par ville</h2>
   <h3>11.1 Fichier purchases.txt</h3>
   <pre>cat > purchases.txt << 'EOF'
 2012-12-31	17:59	Chula Vista	Music	380.67	Visa
@@ -595,61 +345,50 @@ hdfs dfsadmin -report</pre>
 EOF</pre>
 
   <h3>11.2 Projet Maven</h3>
-  <pre>mvn archetype:generate -DgroupId=sn.ehmd -DartifactId=wordcount -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
-cd totalSales</pre>
+  <p>Sur <strong>master</strong>. Maven n’est pas installé par défaut sur Ubuntu.</p>
+  <pre>sudo apt install maven -y
+
+mvn archetype:generate -DgroupId=sn.ehmd -DartifactId=totalSales \
+  -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
+cd totalSales
+
+# L'archétype génère une classe App et un test JUnit inutiles ici :
+# on les supprime (le pom.xml ci-dessous ne déclare pas JUnit).
+rm -rf src/test src/main/java/sn/ehmd/App.java</pre>
 
   <h3>11.3 pom.xml</h3>
-  <pre class="xml">&lt;?<span class="xml-tag">xml</span> <span class="xml-attr">version</span>=<span class="xml-str">"1.0"</span> <span class="xml-attr">encoding</span>=<span class="xml-str">"UTF-8"</span>?&gt;
-&lt;<span class="xml-tag">project</span> <span class="xml-attr">xmlns</span>=<span class="xml-str">"http://maven.apache.org/POM/4.0.0"</span>
-         <span class="xml-attr">xmlns:xsi</span>=<span class="xml-str">"http://www.w3.org/2001/XMLSchema-instance"</span>
-         <span class="xml-attr">xsi:schemaLocation</span>=<span class="xml-str">"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"</span>&gt;
-&lt;<span class="xml-tag">modelVersion</span>&gt;4.0.0&lt;/<span class="xml-tag">modelVersion</span>&gt;
+  <p>Remplacez le contenu du fichier <code>pom.xml</code> généré par :</p>
+  <pre class="xml">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"&gt;
+  &lt;modelVersion&gt;4.0.0&lt;/modelVersion&gt;
 
-&lt;<span class="xml-tag">groupId</span>&gt;sn.ehmd&lt;/<span class="xml-tag">groupId</span>&gt;
-&lt;<span class="xml-tag">artifactId</span>&gt;totalSales&lt;/<span class="xml-tag">artifactId</span>&gt;
-&lt;<span class="xml-tag">version</span>&gt;1.0-SNAPSHOT&lt;/<span class="xml-tag">version</span>&gt;
+  &lt;groupId&gt;sn.ehmd&lt;/groupId&gt;
+  &lt;artifactId&gt;totalSales&lt;/artifactId&gt;
+  &lt;version&gt;1.0-SNAPSHOT&lt;/version&gt;
 
-&lt;<span class="xml-tag">properties</span>&gt;
-    &lt;<span class="xml-tag">maven.compiler.source</span>&gt;8&lt;/<span class="xml-tag">maven.compiler.source</span>&gt;
-    &lt;<span class="xml-tag">maven.compiler.target</span>&gt;8&lt;/<span class="xml-tag">maven.compiler.target</span>&gt;
-    &lt;<span class="xml-tag">project.build.sourceEncoding</span>&gt;UTF-8&lt;/<span class="xml-tag">project.build.sourceEncoding</span>&gt;
+  &lt;properties&gt;
+    &lt;!-- Bytecode Java 11 : s'exécute sans souci sur la JVM 21 du cluster --&gt;
+    &lt;maven.compiler.release&gt;11&lt;/maven.compiler.release&gt;
+    &lt;project.build.sourceEncoding&gt;UTF-8&lt;/project.build.sourceEncoding&gt;
+    &lt;!-- Même version que le cluster installé --&gt;
+    &lt;hadoop.version&gt;3.4.3&lt;/hadoop.version&gt;
+  &lt;/properties&gt;
 
-&lt;/<span class="xml-tag">properties</span>&gt;
-&lt;<span class="xml-tag">dependencies</span>&gt;
-    <span class="xml-com">&lt;!-- https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-common --&gt;</span>
-    &lt;<span class="xml-tag">dependency</span>&gt;
-        &lt;<span class="xml-tag">groupId</span>&gt;org.apache.hadoop&lt;/<span class="xml-tag">groupId</span>&gt;
-        &lt;<span class="xml-tag">artifactId</span>&gt;hadoop-common&lt;/<span class="xml-tag">artifactId</span>&gt;
-        &lt;<span class="xml-tag">version</span>&gt;3.3.6&lt;/<span class="xml-tag">version</span>&gt;
-    &lt;/<span class="xml-tag">dependency</span>&gt;
-    <span class="xml-com">&lt;!-- https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-mapreduce-client-core --&gt;</span>
-    &lt;<span class="xml-tag">dependency</span>&gt;
-        &lt;<span class="xml-tag">groupId</span>&gt;org.apache.hadoop&lt;/<span class="xml-tag">groupId</span>&gt;
-        &lt;<span class="xml-tag">artifactId</span>&gt;hadoop-mapreduce-client-core&lt;/<span class="xml-tag">artifactId</span>&gt;
-        &lt;<span class="xml-tag">version</span>&gt;3.3.6&lt;/<span class="xml-tag">version</span>&gt;
-    &lt;/<span class="xml-tag">dependency</span>&gt;
-    <span class="xml-com">&lt;!-- https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-hdfs --&gt;</span>
-    &lt;<span class="xml-tag">dependency</span>&gt;
-        &lt;<span class="xml-tag">groupId</span>&gt;org.apache.hadoop&lt;/<span class="xml-tag">groupId</span>&gt;
-        &lt;<span class="xml-tag">artifactId</span>&gt;hadoop-hdfs&lt;/<span class="xml-tag">artifactId</span>&gt;
-        &lt;<span class="xml-tag">version</span>&gt;3.3.6&lt;/<span class="xml-tag">version</span>&gt;
-    &lt;/<span class="xml-tag">dependency</span>&gt;
-    <span class="xml-com">&lt;!-- https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-mapreduce-client-common --&gt;</span>
-    &lt;<span class="xml-tag">dependency</span>&gt;
-        &lt;<span class="xml-tag">groupId</span>&gt;org.apache.hadoop&lt;/<span class="xml-tag">groupId</span>&gt;
-        &lt;<span class="xml-tag">artifactId</span>&gt;hadoop-mapreduce-client-common&lt;/<span class="xml-tag">artifactId</span>&gt;
-        &lt;<span class="xml-tag">version</span>&gt;3.3.6&lt;/<span class="xml-tag">version</span>&gt;
-    &lt;/<span class="xml-tag">dependency</span>&gt;
-    <span class="xml-com">&lt;!-- https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-mapreduce-client-jobclient --&gt;</span>
-    &lt;<span class="xml-tag">dependency</span>&gt;
-        &lt;<span class="xml-tag">groupId</span>&gt;org.apache.hadoop&lt;/<span class="xml-tag">groupId</span>&gt;
-        &lt;<span class="xml-tag">artifactId</span>&gt;hadoop-mapreduce-client-jobclient&lt;/<span class="xml-tag">artifactId</span>&gt;
-        &lt;<span class="xml-tag">version</span>&gt;3.3.6&lt;/<span class="xml-tag">version</span>&gt;
-    &lt;/<span class="xml-tag">dependency</span>&gt;
-&lt;/<span class="xml-tag">dependencies</span>&gt;
-&lt;/<span class="xml-tag">project</span>&gt;</pre>
+  &lt;dependencies&gt;
+    &lt;!-- "provided" : Hadoop est déjà présent sur le cluster, on ne l'embarque pas dans le JAR --&gt;
+    &lt;dependency&gt;
+      &lt;groupId&gt;org.apache.hadoop&lt;/groupId&gt;
+      &lt;artifactId&gt;hadoop-client&lt;/artifactId&gt;
+      &lt;version&gt;${hadoop.version}&lt;/version&gt;
+      &lt;scope&gt;provided&lt;/scope&gt;
+    &lt;/dependency&gt;
+  &lt;/dependencies&gt;
+&lt;/project&gt;</pre>
 
   <h3>11.4 TotalSalesByCity.java</h3>
+  <p>À créer dans <code>src/main/java/sn/ehmd/TotalSalesByCity.java</code>.</p>
   <pre class="java"><span class="ij-kw">package</span> sn.ehmd;
 
 <span class="ij-kw">import</span> org.apache.hadoop.conf.<span class="ij-cls">Configuration</span>;
@@ -724,7 +463,8 @@ hdfs dfs -cat /output-ca/part-r-00000</pre>
   <p>
     Hadoop Streaming permet d’écrire le mapper et le reducer en <strong>Python</strong> (ou tout autre langage
     lisant <code>stdin</code> / écrivant sur <code>stdout</code>). Les scripts de référence se trouvent dans
-    <code>src/main/python/</code>.
+    <code>src/main/python/</code> du dépôt du cours : copiez-les sur <strong>master</strong> (avec <code>scp</code>)
+    ou recréez-les avec <code>nano</code> à partir du contenu ci-dessous.
   </p>
   <div class="box box-info">
     <strong>Prérequis :</strong> Python 3 doit être installé sur <strong>tous</strong> les nœuds
@@ -842,38 +582,26 @@ hdfs dfs -cat /output-ca-py/part-*</pre>
   <div class="box box-success">
     <strong>Félicitations !</strong> Vous avez déployé un cluster Hadoop distribué et exécuté un job MapReduce métier (Java et/ou Python).
   </div>
-
-  <div class="footer">ISI — Institut Supérieur d'Informatique | Master 2 — Réseaux Informatiques | Cours : Big Data &amp; Analyse de données | TP N°2 — Année universitaire 2025-2026</div>
-
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-  <script>
-    if (window.mermaid) {
-      mermaid.initialize({
-        startOnLoad: true,
-        theme: 'dark',
-        securityLevel: 'loose',
-        flowchart: {
-          nodeSpacing: 80,
-          rankSpacing: 120,
-          padding: 40,
-          htmlLabels: true,
-          curve: 'linear'
-        },
-        themeVariables: {
-          lineColor: '#7dd3fc',
-          primaryTextColor: '#e5e7eb',
-          secondaryTextColor: '#e5e7eb',
-          tertiaryTextColor: '#e5e7eb',
-          textColor: '#e5e7eb',
-          mainBkg: '#2b2b2b',
-          nodeBorder: '#7dd3fc',
-          clusterBkg: '#252526',
-          clusterBorder: '#5a5a5a',
-          titleColor: '#e5e7eb',
-          edgeLabelBackground: '#1e1e1e'
-        }
-      });
-    }
-  </script>
+<div class="pager"><a class="prev" href="tp1.html"><small>← Précédent</small>TP1 — Pseudo-distribué</a><a class="next" href="tp3.html"><small>Suivant →</small>TP3 — Cluster sur AWS EC2</a></div>
+  </main>
+</div>
+<footer class="site-footer">ISI — Institut Supérieur d'Informatique · Master 1 — IAGE · Big Data &amp; Analyse de données · Année universitaire 2026-2027</footer>
+<script src="assets/tp.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  if (window.mermaid) {
+    mermaid.initialize({
+      startOnLoad: true, theme: 'dark', securityLevel: 'loose',
+      flowchart: { nodeSpacing: 70, rankSpacing: 100, padding: 30, htmlLabels: true, curve: 'linear' },
+      themeVariables: {
+        fontFamily: '-apple-system, Segoe UI, Roboto, Arial, sans-serif',
+        lineColor: '#f4b183', primaryColor: '#2c4f86', primaryTextColor: '#f1f5f9', primaryBorderColor: '#f4b183',
+        secondaryTextColor: '#e5e7eb', tertiaryTextColor: '#e5e7eb', textColor: '#e5e7eb',
+        mainBkg: '#2c4f86', nodeBorder: '#f4b183', clusterBkg: '#1a2f52', clusterBorder: '#3a5583',
+        titleColor: '#f4b183', edgeLabelBackground: '#13233f'
+      }
+    });
+  }
+</script>
 </body>
 </html>

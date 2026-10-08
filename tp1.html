@@ -1,336 +1,44 @@
 <!DOCTYPE html>
-<html lang="fr" data-theme="light" style=""><head>
-    <meta charset="UTF-8">
-    <title>TP1 - Installation Hadoop 3.4.3 - ISI</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <style>
-      /* 
-   CONFIGURATION DE LA PAGE (A4)
-   Note : Bien que @page soit pour l'impression, le body simule le rendu écran.
-*/
-      @page {
-        size: A4 portrait;
-        margin: 2.5cm;
-      }
-
-      :root {
-        --code-bg: #2b2b2b;
-        --code-fg: #a9b7c6;
-        --code-border: #3c3f41;
-        --code-shell: #2ecc71;
-        --code-xml: #5dade2;
-        --code-java: #c678dd;
-      }
-
-      body {
-      /* max-width: 210mm; */
-        margin: 0 auto;
-        padding: 0 2.5cm; /* Simulation visuelle des marges sur écran */
-        background-color: #ffffff;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        font-size: 10.5pt;
-        line-height: 1.4;
-        color: #000000;
-        box-sizing: border-box;
-      }
-
-      /* HEADER INSTITUTIONNEL */
-      .header-container {
-        border: 1px solid #000;
-        padding: 15px;
-        margin-bottom: 30px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-family: 'Times New Roman', serif;
-      }
-
-      .header-left {
-        text-align: left;
-        font-size: 9pt;
-        width: 30%;
-      }
-
-      .header-center {
-        text-align: center;
-        font-weight: bold;
-        font-size: 14pt;
-        width: 40%;
-      }
-
-      .header-right {
-        text-align: right;
-        font-size: 9pt;
-        width: 30%;
-      }
-
-      .isi-logo {
-        display: inline-block;
-        border: 2px solid #000;
-        padding: 5px 10px;
-        font-weight: bold;
-        font-size: 18pt;
-        margin-bottom: 5px;
-      }
-
-      /* TITRES */
-      h1 {
-        font-size: 18pt;
-        color: #1a3a5c;
-        text-align: center;
-        margin-top: 20px;
-        margin-bottom: 10px;
-        text-transform: uppercase;
-        border-bottom: 2px solid #1a3a5c;
-        padding-bottom: 10px;
-      }
-
-      .subtitle {
-        text-align: center;
-        font-size: 12pt;
-        color: #444;
-        margin-bottom: 5px;
-        font-weight: bold;
-      }
-
-      .meta-info {
-        text-align: center;
-        font-size: 10pt;
-        color: #666;
-        margin-bottom: 40px;
-        font-style: italic;
-      }
-
-      h2 {
-        font-size: 14pt;
-        color: #1a3a5c;
-        border-bottom: 1px solid #ccc;
-        padding-bottom: 5px;
-        margin-top: 30px;
-        margin-bottom: 15px;
-      }
-
-      h3 {
-        font-size: 12pt;
-        color: #2c5282;
-        margin-top: 20px;
-        margin-bottom: 10px;
-      }
-
-      /* BADGES DE VERSION */
-      .badge {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 4px;
-        font-size: 0.85em;
-        font-weight: bold;
-        color: white;
-        vertical-align: middle;
-        margin-left: 5px;
-      }
-      .badge-hadoop {
-        background-color: #e67e22;
-      }
-      .badge-java {
-        background-color: #e74c3c;
-      }
-
-      /* BLOCS DE CODE (harmonisés avec TP2–TP4 — accents colorés par type) */
-      pre {
-        background-color: var(--code-bg);
-        color: var(--code-fg);
-        border: 1px solid var(--code-border);
-        border-left: 4px solid var(--code-shell);
-        border-radius: 4px;
-        padding: 12px;
-        overflow-x: auto;
-        font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
-        font-size: 9pt;
-        line-height: 1.55;
-        tab-size: 4;
-        margin: 10px 0;
-        white-space: pre-wrap;
-      }
-
-      pre code {
-        background: transparent;
-        color: inherit;
-        padding: 0;
-        border: 0;
-        font-family: inherit;
-        font-size: inherit;
-      }
-
-      pre.xml {
-        border-left-color: var(--code-xml);
-      }
-
-      pre.xml .xml-tag { color: #e8bf6a; }
-      pre.xml .xml-attr { color: #bababa; }
-      pre.xml .xml-str { color: #6a8759; }
-      pre.xml .xml-com { color: #7a7a7a; font-style: italic; }
-
-      pre.java {
-        border-left-color: var(--code-java);
-      }
-
-      pre.java .ij-kw { color: #cc7832; }
-      pre.java .ij-cls { color: #4ec9b0; }
-      pre.java .ij-met { color: #ffc66d; }
-      pre.java .ij-var { color: #9876aa; }
-      pre.java .ij-str { color: #6a8759; }
-      pre.java .ij-num { color: #6897bb; }
-
-      code {
-        font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
-      }
-
-      /* TABLEAUX */
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 15px 0;
-        font-size: 10pt;
-      }
-
-      th {
-        background-color: #1a3a5c;
-        color: white;
-        padding: 8px;
-        text-align: left;
-        border: 1px solid #ddd;
-      }
-
-      td {
-        padding: 8px;
-        border: 1px solid #ddd;
-        vertical-align: top;
-      }
-
-      tr:nth-child(even) {
-        background-color: #f2f2f2;
-      }
-
-      /* ENCADRÉS (ALERTE, INFO, SUCCÈS) */
-      .box {
-        padding: 10px 15px;
-        margin: 15px 0;
-        border-left: 5px solid;
-        border-radius: 4px;
-      }
-
-      .box-info {
-        background-color: #e7f3fe;
-        border-color: #2196f3;
-        color: #0c5460;
-      }
-
-      .box-warning {
-        background-color: #fff3cd;
-        border-color: #ff9800;
-        color: #856404;
-      }
-
-      .box-success {
-        background-color: #d4edda;
-        border-color: #28a745;
-        color: #155724;
-      }
-
-      /* PIED DE PAGE */
-      .footer {
-        margin-top: 50px;
-        padding-top: 10px;
-        border-top: 1px solid #ccc;
-        font-size: 9pt;
-        text-align: center;
-        color: #666;
-      }
-
-      /* SAUTS DE PAGE */
-      .page-break {
-        page-break-before: always;
-      }
-
-      /* LISTES */
-      ul,
-      ol {
-        margin-top: 5px;
-        margin-bottom: 10px;
-        padding-left: 25px;
-      }
-      li {
-        margin-bottom: 5px;
-      }
-      .page-break{
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-    
-
-      .top-nav {
-        position: sticky;
-        top: 0;
-        z-index: 1000;
-        background: #f8fbff;
-        border: 1px solid #d8e3f0;
-        border-radius: 10px;
-        padding: 12px 16px;
-        margin: 18px 0 24px 0;
-        display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: center;
-      }
-      .top-nav a {
-        text-decoration: none;
-        background: #1a3a5c;
-        color: white;
-        padding: 8px 14px;
-        border-radius: 8px;
-        font-size: 10pt;
-        font-weight: 600;
-      }
-      .top-nav a.secondary {
-        background: #2c5282;
-      }
-
-    </style>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Open%20Sans:wght@400&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Google%20Sans:wght@400&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400&amp;display=swap" rel="stylesheet"></head>
-  <body >
-
-    <div class="top-nav">
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TP1 — Installation de Hadoop en pseudo-distribué — ISI M1 IAGE</title>
+  <meta name="description" content="TP1 du module Big Data (ISI, Master 1 IAGE) : installation d'Apache Hadoop 3.4.3 en mode pseudo-distribué.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/tp.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html"><img src="logo.jpg" alt="Logo ISI"><span>Big Data — TP<small>ISI · Master 1 IAGE · 2026-2027</small></span></a>
+    <nav class="nav" aria-label="Navigation des TP">
       <a href="index.html">Accueil</a>
-      <a class="secondary" href="tp1.html">TP1</a>
-      <a class="secondary" href="tp2.html">TP2</a>
-      <a class="secondary" href="tp3.html">TP3</a>
-      <a class="secondary" href="tp4.html">TP4</a>
+      <a href="tp1.html">TP1</a>
+      <a href="tp2.html">TP2</a>
+      <a href="tp3.html">TP3</a>
+      <a href="tp4.html">TP4</a>
+    </nav>
+  </div>
+</header>
+<header class="doc-hero">
+  <div class="doc-hero-inner">
+    <div class="logo-tile"><img src="logo.jpg" alt="Logo ISI"></div>
+    <div>
+      <p class="eyebrow">Travaux pratiques n°1 · Big Data &amp; Analyse de données</p>
+      <h1>Installer Apache Hadoop en mode pseudo-distribué</h1>
+      <p class="lead">Installer HDFS, YARN et MapReduce sur une seule machine, puis valider l'installation par un premier job.</p>
+      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Hadoop 3.4.3</span><span class="chip">Java 21</span><span class="chip">Ubuntu 24.04 LTS</span><span class="chip">Version 3.0 · Octobre 2026</span></div>
     </div>
-
-    <!-- HEADER INSTITUTIONNEL -->
-
-
-    <div class="page-break">
-      <div class="logo-container">
-        <img src="logo.jpg" alt="Logo ISI" class="logo" style="width: 100px; height: 100px;">
-      </div>
-      <h1>Travaux Pratiques N°1<br>Installation et configuration d'Apache Hadoop<br>en mode Pseudo-Distribué</h1>
-      <div class="">
-        Année universitaire<br>
-        <strong>2025 - 2026</strong>
-      </div>
-    </div>
-
-    <div class="subtitle">Cours : Big Data &amp; Analyse de données | Niveau : Master 2 — Réseaux Informatiques — ISI</div>
-    <div class="meta-info">
-      Version du document : 2.0 (Mis à jour pour Hadoop 3.4.3 &amp; Java 21) — Date : Mars 2026
-    </div>
-
-    <h2>Introduction</h2>
+  </div>
+</header>
+<section class="brief" aria-label="Fiche du TP"><div class="card"><h3>Objectif</h3><p>Un cluster complet sur une seule machine : les cinq démons Hadoop tournent chacun dans sa JVM.</p></div><div class="card"><h3>Lien avec le cours</h3><p>Chapitre 3 — HDFS et YARN : NameNode, DataNode, ResourceManager, NodeManager.</p></div><div class="card metier"><h3>Enjeu métier (IAGE)</h3><p>Disposer d'un laboratoire à coût nul : tester un traitement sur un poste avant d'investir dans un cluster.</p></div></section>
+<div class="doc-layout">
+  <nav class="toc card" aria-label="Sommaire"><h2>Sommaire</h2><ol></ol></nav>
+  <main class="doc">
+<h2 id="introduction">Introduction</h2>
     <p>
       <strong>Apache Hadoop</strong> est un framework open-source conçu pour le stockage et le traitement distribué de
       grands ensembles de données (Big Data) sur des clusters de machines standard. Il repose sur quatre modules
@@ -354,17 +62,16 @@
 
     <div class="box box-info">
       <strong>Objectif du TP :</strong> Ce guide détaille l'installation pas à pas d'<strong>Apache Hadoop version</strong>
-      <span class="badge badge-hadoop">3.4.3</span> sur le système d'exploitation <strong>Ubuntu 22.04 LTS</strong>.
+      <span class="badge badge-hadoop">3.4.3</span> sur le système d'exploitation <strong>Ubuntu 24.04 LTS</strong>.
       Nous utiliserons le <strong>Mode Pseudo-Distribué</strong>.
     </div>
 
     <p>
-      <em>Note sur le mode Pseudo-Distribué :</em> Dans ce mode, tous les démons Hadoop (NameNode, DataNode,
+      <em>Note sur le mode Pseudo-Distribué :</em> Dans ce mode, tous les démons Hadoop (NameNode, SecondaryNameNode, DataNode,
       ResourceManager, NodeManager) s'exécutent sur une seule machine (votre ordinateur), chacun dans un processus Java
       distinct. Cela simule un cluster complet et est idéal pour l'apprentissage, le développement et le test.
     </p>
-
-    <h2>1. Prérequis</h2>
+<h2 id="1-prerequis">1. Prérequis</h2>
 
     <h3>1.1 Configuration matérielle recommandée</h3>
     <table>
@@ -378,8 +85,8 @@
       <tbody>
         <tr>
           <td>Système d'exploitation</td>
-          <td>Ubuntu 22.04 LTS (64-bit)</td>
-          <td>Ubuntu 22.04 LTS (64-bit)</td>
+          <td>Ubuntu 24.04 LTS (64-bit)</td>
+          <td>Ubuntu 24.04 LTS (64-bit)</td>
         </tr>
         <tr>
           <td>Mémoire RAM</td>
@@ -403,11 +110,10 @@
     <p>Avant de commencer, assurez-vous que votre système est à jour :</p>
     <pre>sudo apt update
 </pre>
-
-    <h2>2. Installation de Java OpenJDK 21</h2>
+<h2 id="2-installation-de-java-openjdk-21">2. Installation de Java OpenJDK 21</h2>
     <p>
-      Depuis la version 3.4.x, Hadoop supporte officiellement les versions récentes de Java LTS. Nous utiliserons
-      <strong>OpenJDK 21</strong> <span class="badge badge-java">Java 21</span> pour ce TP.
+      Nous utiliserons <strong>OpenJDK 21</strong> <span class="badge badge-java">Java 21</span>, la même version
+      pour l'ensemble des TP (TP1 à TP3).
     </p>
 
     <pre>sudo apt install openjdk-21-jdk -y
@@ -428,8 +134,7 @@ readlink -f $(which java)
       Le chemin devrait ressembler à : <code>/usr/lib/jvm/java-21-openjdk-amd64/bin/java</code>. <br>Le
       <strong>JAVA_HOME</strong> sera donc : <code>/usr/lib/jvm/java-21-openjdk-amd64</code>.
     </p>
-
-    <h2>3. Configuration SSH et utilisateur Hadoop</h2>
+<h2 id="3-configuration-ssh-et-utilisateur-hadoop">3. Configuration SSH et utilisateur Hadoop</h2>
     <p>Hadoop nécessite SSH pour gérer ses nœuds, même en mode pseudo-distribué.</p>
 
     <h3>3.1 Installation SSH et pdsh</h3>
@@ -442,7 +147,6 @@ readlink -f $(which java)
 sudo usermod -aG sudo hadoop
 sudo passwd hadoop
 # Entrez un mot de passe simple (ex: hadoop) pour le TP
-sudo usermod -aG sudo hadoop
 </pre>
 
     <p>Connectez-vous avec ce nouvel utilisateur :</p>
@@ -466,15 +170,11 @@ ssh localhost
       l'empreinte. Si vous êtes connecté sans demande de mot de passe, la configuration est réussie. Tapez
       <code>exit</code> pour revenir au shell normal si nécessaire.
     </div>
-
-    <!-- SAUT DE PAGE AVANT L'INSTALLATION LOURDE -->
-    <div class="page-break"></div>
-
-    <h2>4. Téléchargement et installation de Hadoop 3.4.3</h2>
+<h2 id="4-telechargement-et-installation-de-hadoop-3-4-3">4. Téléchargement et installation de Hadoop 3.4.3</h2>
     <p>Nous allons télécharger la version binaire stable depuis les miroirs Apache.</p>
 
     <pre># Téléchargement
-wget https://dlcdn.apache.org/hadoop/common/hadoop-3.4.3/hadoop-3.4.3.tar.gz
+wget https://archive.apache.org/dist/hadoop/common/hadoop-3.4.3/hadoop-3.4.3.tar.gz
 
 # Extraction
 tar -xvzf hadoop-3.4.3.tar.gz
@@ -489,8 +189,7 @@ sudo chown -R hadoop:hadoop /opt/hadoop
     <p>Vérification rapide :</p>
     <pre>ls -l /opt/hadoop
 </pre>
-
-    <h2>5. Configuration des variables d'environnement</h2>
+<h2 id="5-configuration-des-variables-d-environnement">5. Configuration des variables d'environnement</h2>
     <p>Il faut configurer le shell pour qu'il trouve les commandes Hadoop et Java.</p>
 
     <p>Éditez le fichier <code>.bashrc</code> de l'utilisateur hadoop :</p>
@@ -526,8 +225,7 @@ export HADOOP_OPTS="-Djava.library.path=$HADOOP_HOME/lib/native"
     <p>Trouvez la ligne <code>export JAVA_HOME=...</code> (souvent commentée) et remplacez-la par :</p>
     <pre>export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
 </pre>
-
-    <h2>6. Configuration du cluster Hadoop (Mode Pseudo-Distribué)</h2>
+<h2 id="6-configuration-du-cluster-hadoop-mode-pseudo-distribue">6. Configuration du cluster Hadoop (Mode Pseudo-Distribué)</h2>
     <p>Nous devons modifier 4 fichiers XML situés dans <code>$HADOOP_HOME/etc/hadoop/</code>.</p>
 
     <h3>6.1 Création des répertoires de données HDFS</h3>
@@ -556,16 +254,12 @@ sudo chown -R hadoop:hadoop /home/hadoop/hdfs/
         &lt;value&gt;1&lt;/value&gt;
     &lt;/property&gt;
     &lt;property&gt;
-        &lt;name&gt;dfs.name.dir&lt;/name&gt;
+        &lt;name&gt;dfs.namenode.name.dir&lt;/name&gt;
         &lt;value&gt;file:///home/hadoop/hdfs/namenode&lt;/value&gt;
     &lt;/property&gt;
     &lt;property&gt;
-        &lt;name&gt;dfs.data.dir&lt;/name&gt;
+        &lt;name&gt;dfs.datanode.data.dir&lt;/name&gt;
         &lt;value&gt;file:///home/hadoop/hdfs/datanode&lt;/value&gt;
-    &lt;/property&gt;
-    &lt;property&gt;
-    &lt;name&gt;dfs.blocksize&lt;/name&gt;
-    &lt;value&gt;268435456&lt;/value&gt;
     &lt;/property&gt;
     &lt;property&gt;
       &lt;name&gt;dfs.namenode.rpc-bind-host&lt;/name&gt;
@@ -585,6 +279,7 @@ sudo chown -R hadoop:hadoop /home/hadoop/hdfs/
     &lt;/property&gt;
 &lt;/configuration&gt;
 </pre>
+    <p>La taille de bloc n'est pas modifiée : on garde la valeur par défaut de <strong>128 Mo</strong>, celle étudiée au chapitre 3 du cours.</p>
 
     <h3>6.4 Fichier mapred-site.xml</h3>
     <p>Indique à MapReduce d'utiliser YARN comme gestionnaire de ressources.</p>
@@ -631,11 +326,11 @@ sudo chown -R hadoop:hadoop /home/hadoop/hdfs/
     &lt;/property&gt;
 &lt;/configuration&gt;
 </pre>
-
-    <!-- SAUT DE PAGE AVANT LE DÉMARRAGE -->
-    <div class="page-break"></div>
-
-    <h2>7. Initialisation et démarrage du cluster</h2>
+    <div class="box box-info">
+      <strong>Mémoire YARN :</strong> <code>yarn.nodemanager.resource.memory-mb = 4096</code> convient à une machine de 8 Go.
+      Si votre machine n'a que 4 Go de RAM, indiquez <code>2048</code>.
+    </div>
+<h2 id="7-initialisation-et-demarrage-du-cluster">7. Initialisation et démarrage du cluster</h2>
 
     <h3>7.1 Formatage du NameNode</h3>
     <p>Cette étape initialise le système de fichiers HDFS. Elle ne doit être faite qu'une seule fois.</p>
@@ -651,6 +346,7 @@ sudo chown -R hadoop:hadoop /home/hadoop/hdfs/
     <p>Avant de démarrer, définissons le type de connexion RCMD pour éviter une erreur courante avec pdsh :</p>
     <pre>export PDSH_RCMD_TYPE=ssh
 </pre>
+    <p>Pour ne pas avoir à la retaper à chaque session, ajoutez aussi cette ligne à la fin de <code>~/.bashrc</code>.</p>
 
     <p>Vous pouvez démarrer tous les services (HDFS + YARN) en une seule commande :</p>
     <pre>start-all.sh
@@ -665,14 +361,13 @@ start-yarn.sh
     <p>Pour arrêter proprement le cluster à la fin du TP :</p>
     <pre>stop-all.sh
 </pre>
-
-    <h2>8. Vérification et validation</h2>
+<h2 id="8-verification-et-validation">8. Vérification et validation</h2>
 
     <h3>8.1 Vérification des processus Java actifs</h3>
     <p>Utilisez l'outil <code>jps</code> (Java Process Status) pour vérifier que tous les démons tournent.</p>
     <pre>jps
 </pre>
-    <p>Vous devez voir impérativement ces <strong>6 processus</strong> (les numéros PID seront différents) :</p>
+    <p>Vous devez voir ces <strong>5 démons Hadoop</strong>, plus <code>Jps</code> lui-même (les numéros PID seront différents) :</p>
     <table>
       <tbody><tr>
         <th>Nom du Processus</th>
@@ -684,7 +379,7 @@ start-yarn.sh
       </tr>
       <tr>
         <td><strong>DataNode</strong></td>
-        <td>Esclave HDFS (Stockage des blocs de données)</td>
+        <td>Travailleur HDFS (stockage des blocs de données)</td>
       </tr>
       <tr>
         <td><strong>ResourceManager</strong></td>
@@ -692,7 +387,7 @@ start-yarn.sh
       </tr>
       <tr>
         <td><strong>NodeManager</strong></td>
-        <td>Esclave YARN (Exécution des conteneurs)</td>
+        <td>Travailleur YARN (exécution des conteneurs)</td>
       </tr>
       <tr>
         <td><strong>SecondaryNameNode</strong></td>
@@ -734,7 +429,7 @@ hdfs dfs -ls /test_input/
 hdfs dfs -cat /test_input/syslog | head -5
 </pre>
 
-    <h3>8.4 Exécution d'un job MapReduce (Exemple WordCount/Grep)</h3>
+    <h3>8.4 Exécution d'un job MapReduce d'exemple (Grep)</h3>
     <p>Nous allons lancer un programme d'exemple (Grep) qui compte les occurrences d'un motif.</p>
     <pre># Préparation : Copier les fichiers XML de config comme données d'entrée
 hdfs dfs -mkdir input
@@ -748,10 +443,9 @@ hdfs dfs -cat output/*
 </pre>
     <div class="box box-success">
       Si vous voyez une liste de propriétés commençant par "dfs..." avec un nombre à côté, félicitations ! Votre cluster
-      Hadoop est fonctionnel capable d'exécuter des traitements MapReduce.
+      Hadoop est fonctionnel et capable d'exécuter des traitements MapReduce.
     </div>
-
-    <h2>9. Résolution des problèmes courants (Dépannage)</h2>
+<h2 id="9-resolution-des-problemes-courants-depannage">9. Résolution des problèmes courants (Dépannage)</h2>
     <table>
       <thead>
         <tr>
@@ -769,7 +463,7 @@ hdfs dfs -cat output/*
         <tr>
           <td>NameNode est en <strong>safe mode</strong></td>
           <td>Protection automatique au démarrage</td>
-          <td>Attendre ou forcer la sortie : <code>hdfs dfsadmin -safemode leave</code></td>
+          <td>Attendre que les DataNodes envoient leurs rapports de blocs (quelques secondes). Ne forcer la sortie (<code>hdfs dfsadmin -safemode leave</code>) qu'après avoir vérifié <code>hdfs dfsadmin -report</code>.</td>
         </tr>
         <tr>
           <td><strong>Permission denied</strong> lors du start-all.sh</td>
@@ -788,10 +482,7 @@ hdfs dfs -cat output/*
         </tr>
       </tbody>
     </table>
-
-    <div class="page-break"></div>
-
-    <h2>Annexes</h2>
+<h2 id="annexes">Annexes</h2>
 
     <h3>Annexe A — Récapitulatif des ports Hadoop</h3>
     <table>
@@ -897,7 +588,7 @@ hdfs dfs -cat output/*
         </tr>
         <tr>
           <td><code>hdfs dfsadmin -safemode leave</code></td>
-          <td>Forcer la sortie du mode sans échec</td>
+          <td>Forcer la sortie du mode sans échec (uniquement après diagnostic)</td>
         </tr>
         <tr>
           <td><code>hdfs namenode -format</code></td>
@@ -905,11 +596,11 @@ hdfs dfs -cat output/*
         </tr>
       </tbody>
     </table>
+<div class="pager"><span></span><a class="next" href="tp2.html"><small>Suivant →</small>TP2 — Cluster 4 nœuds sur VirtualBox</a></div>
+  </main>
+</div>
+<footer class="site-footer">ISI — Institut Supérieur d'Informatique · Master 1 — IAGE · Big Data &amp; Analyse de données · Année universitaire 2026-2027</footer>
+<script src="assets/tp.js"></script>
 
-    <div class="footer">
-      ISI — Institut Supérieur d'Informatique | Master 2 — Réseaux Informatiques | Cours : Big Data &amp; Analyse de données | TP N°1 — Année universitaire 2025-2026
-    </div>
-  
-
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
-</body></html>
+</body>
+</html>

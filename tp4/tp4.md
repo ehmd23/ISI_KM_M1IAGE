@@ -1,8 +1,8 @@
 # TP4 — Apache Hive sur HDFS avec Hue (Docker)
 
 **Cours :** Big Data et analyse de données  
-**Niveau :** Master 2 - Réseaux Informatiques — ISI  
-**Année universitaire :** 2025-2026  
+**Niveau :** Master 1 — IAGE (Informatique Appliquée à la Gestion des Entreprises) — ISI  
+**Année universitaire :** 2026-2027  
 **Version du document :** 1.3
 
 ---
@@ -525,7 +525,7 @@ CREATE EXTERNAL TABLE purchases_hive_ext (
 ROW FORMAT DELIMITED
 FIELDS TERMINATED BY ';'
 STORED AS TEXTFILE
-LOCATION '/data/retail/purchases_hive';
+LOCATION 'hdfs://namenode:9000/data/retail/purchases_hive';
 
 DESCRIBE purchases_hive_ext;
 SELECT * FROM purchases_hive_ext LIMIT 10;
@@ -655,4 +655,4 @@ Un court rapport (PDF ou Markdown) contenant :
 
 ---
 
-*ISI — Institut supérieur d’informatique — Master 2 — Réseaux Informatiques — Big Data et analyse de données — TP n°4*
+*ISI — Institut supérieur d’informatique — Master 1 — IAGE — Big Data et analyse de données — TP n°4*

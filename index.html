@@ -3,294 +3,172 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Accueil - Travaux Pratiques Hadoop</title>
+  <title>Travaux pratiques Big Data — ISI M1 IAGE</title>
+  <meta name="description" content="Portail des travaux pratiques du module Big Data &amp; Analyse de données — ISI, Master 1 IAGE, année 2026-2027.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/tp.css">
   <style>
-    :root {
-      --primary: #1a3a5c;
-      --primary-2: #2c5282;
-      --accent: #e67e22;
-      --bg: #f4f7fb;
-      --card: #ffffff;
-      --text: #1f2937;
-      --muted: #6b7280;
-      --border: #d9e2ec;
-      --success: #1f9d55;
+    .wrap { max-width: 1240px; margin: 0 auto; padding: 0 20px; }
+    .section-title { font-family: var(--serif); font-weight: 600; color: var(--navy); font-size: 28px; margin: 44px 0 6px; }
+    .section-sub { color: var(--muted); margin: 0 0 20px; }
+    .tp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 18px; }
+    .tp-card { display: flex; flex-direction: column; padding: 22px; position: relative; overflow: hidden; }
+    .tp-num {
+      width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      background: var(--navy); color: #fff; font-family: var(--serif); font-size: 20px; margin-bottom: 14px;
     }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(180deg, #eef4fb 0%, #f9fbfd 100%);
-      color: var(--text);
-    }
-    .container {
-      width: min(1150px, calc(100% - 32px));
-      margin: 0 auto;
-    }
-    .hero {
-      padding: 38px 0 28px;
-    }
-    .hero-box {
-      background: linear-gradient(135deg, #16324f 0%, #2c5282 100%);
-      color: white;
-      border-radius: 20px;
-      padding: 28px;
-      display: grid;
-      grid-template-columns: 110px 1fr;
-      gap: 22px;
-      align-items: center;
-      box-shadow: 0 18px 40px rgba(26, 58, 92, 0.18);
-    }
-    .hero img {
-      width: 100px;
-      height: 100px;
-      object-fit: contain;
-      background: rgba(255,255,255,0.12);
-      border-radius: 16px;
-      padding: 8px;
-    }
-    .hero h1 {
-      margin: 0 0 8px;
-      font-size: 2rem;
-      line-height: 1.2;
-    }
-    .hero p {
-      margin: 0;
-      color: rgba(255,255,255,0.92);
-      max-width: 780px;
-      font-size: 1.02rem;
-    }
-    .meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 14px;
-    }
-    .chip {
-      background: rgba(255,255,255,0.12);
-      border: 1px solid rgba(255,255,255,0.18);
-      border-radius: 999px;
-      padding: 7px 12px;
-      font-size: 0.95rem;
-    }
-    .section-title {
-      margin: 26px 0 14px;
-      color: var(--primary);
-      font-size: 1.4rem;
-    }
-    .intro {
-      background: white;
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 20px 22px;
-      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
-      gap: 22px;
-      margin: 18px 0 38px;
-    }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 22px;
-      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-    .card h3 {
-      margin: 0;
-      color: var(--primary);
-      font-size: 1.28rem;
-    }
-    .badge-row {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    .badge {
-      display: inline-block;
-      padding: 6px 10px;
-      border-radius: 999px;
-      font-size: 0.84rem;
-      font-weight: 700;
-      color: white;
-    }
-    .b1 { background: #e67e22; }
-    .b2 { background: #d64545; }
-    .b3 { background: #16a34a; }
-    .b4 { background: #2c5282; }
-    .card p {
-      margin: 0;
-      color: #374151;
-      line-height: 1.6;
-    }
-    .list {
-      margin: 0;
-      padding-left: 18px;
-      color: #374151;
-      line-height: 1.6;
-    }
-    .actions {
-      margin-top: auto;
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
+    .tp-card h3 { font-family: var(--serif); font-weight: 600; color: var(--navy); font-size: 20px; line-height: 1.3; margin: 0 0 8px; }
+    .tp-card p { margin: 0 0 12px; font-size: 15px; }
+    .tp-q { background: var(--orange-tint); border-radius: 8px; padding: 10px 12px; font-size: 14.5px; color: #5a2a08; margin-bottom: 12px; }
+    .tp-q b { color: var(--orange); display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 2px; }
+    .tp-card ul { margin: 0 0 14px; padding-left: 20px; font-size: 14.5px; }
+    .tp-card li { margin-bottom: 4px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: auto 0 16px; }
+    .tag { font-size: 12.5px; font-weight: 600; color: var(--navy); background: var(--navy-tint); border-radius: 999px; padding: 3px 10px; }
     .btn {
-      display: inline-block;
-      text-decoration: none;
-      background: var(--primary);
-      color: white;
-      padding: 10px 14px;
-      border-radius: 10px;
-      font-weight: 600;
-      box-shadow: 0 8px 18px rgba(26, 58, 92, 0.18);
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none;
+      background: var(--navy); color: #fff; font-weight: 600; padding: 10px 16px; border-radius: 9px;
     }
-    .btn.secondary {
-      background: var(--primary-2);
-    }
-    .info-strip {
-      background: #edf7ff;
-      border-left: 5px solid #2196f3;
-      color: #0c5460;
-      padding: 14px 16px;
-      border-radius: 10px;
-      margin-bottom: 28px;
-    }
-    footer {
-      color: var(--muted);
-      text-align: center;
-      padding: 8px 0 34px;
-      font-size: 0.95rem;
-    }
-    @media (max-width: 720px) {
-      .hero-box { grid-template-columns: 1fr; text-align: center; }
-      .hero img { margin: 0 auto; }
-    }
+    .btn:hover { background: var(--orange); color: #fff; }
+    .two-col { display: grid; grid-template-columns: 1.15fr 1fr; gap: 18px; }
+    .two-col .card { padding: 22px 24px; }
+    .two-col h3 { margin: 0 0 10px; color: var(--navy); font-size: 18px; }
+    .two-col ul { margin: 0; padding-left: 20px; }
+    .two-col li { margin-bottom: 6px; }
+    .map td:first-child { white-space: nowrap; font-weight: 600; color: var(--navy); }
+    .fil { margin-top: 18px; }
+    @media (max-width: 860px) { .two-col { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
-  <div class="container">
-    <section class="hero">
-      <div class="hero-box">
-        <img src="logo.jpg" alt="Logo ISI">
-        <div>
-          <h1>Accueil des Travaux Pratiques Hadoop</h1>
-          <p>
-            Cette page d'accueil centralise vos travaux pratiques du module <strong>Big Data & Analyse de données</strong>
-            pour le <strong>Master 2 - Réseaux Informatiques</strong> de l'<strong>ISI</strong>.
-          </p>
-          <div class="meta">
-            <span class="chip">Année universitaire 2025 - 2026</span>
-            <span class="chip">Master 2 — Réseaux Informatiques</span>
-            <span class="chip">Apache Hadoop 3.4.3</span>
-            <span class="chip">Java 21</span>
-            <span class="chip">Python 3</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-
-
-
-    <div class="grid">
-      <article class="card">
-        <div class="badge-row">
-          <span class="badge b1">TP1</span>
-          <span class="badge b2">Hadoop 3.4.3</span>
-          <span class="badge b3">Pseudo-distribué</span>
-        </div>
-        <h3>Installation et configuration d'Apache Hadoop en mode pseudo-distribué</h3>
-        <p>
-          Ce premier TP présente l'installation de Hadoop sur une seule machine en mode pseudo-distribué, avec la configuration de Java,
-          SSH, HDFS, YARN et l'exécution d'un premier job de test.
-        </p>
-        <ul class="list">
-          <li>Installation de Java OpenJDK 21</li>
-          <li>Configuration SSH et utilisateur hadoop</li>
-          <li>Configuration de HDFS, MapReduce et YARN</li>
-          <li>Validation avec un job MapReduce d'exemple</li>
-        </ul>
-        <div class="actions">
-          <a class="btn" href="tp1.html">Ouvrir le TP1</a>
-        </div>
-      </article>
-
-      <article class="card">
-        <div class="badge-row">
-          <span class="badge b1">TP2</span>
-          <span class="badge b2">Cluster 4 nœuds</span>
-          <span class="badge b3">VirtualBox</span>
-        </div>
-        <h3>Déploiement d'un cluster Hadoop 4 nœuds sur VirtualBox</h3>
-        <p>
-          Ce deuxième TP étend le précédent vers une architecture réellement distribuée, avec un master et trois workers,
-          la configuration réseau inter-VM et l'exécution d'un job MapReduce métier de calcul du chiffre d'affaires par ville.
-        </p>
-        <ul class="list">
-          <li>Création des 4 machines virtuelles</li>
-          <li>Configuration réseau, hostname et SSH</li>
-          <li>Déploiement de HDFS et YARN sur plusieurs nœuds</li>
-          <li>Exécution MapReduce <code>TotalSalesByCity</code> (Java + Python Streaming)</li>
-        </ul>
-        <div class="actions">
-          <a class="btn secondary" href="tp2.html">Ouvrir le TP2</a>
-        </div>
-      </article>
-
-      <article class="card">
-        <div class="badge-row">
-          <span class="badge b1">TP3</span>
-          <span class="badge b2">AWS EC2</span>
-          <span class="badge b3">Cloud</span>
-        </div>
-        <h3>Déploiement d'un cluster Hadoop 4 nœuds sur AWS EC2</h3>
-        <p>
-          Ce troisième TP transpose le cluster Hadoop distribué vers le cloud AWS, avec la création des instances EC2,
-          la configuration du Security Group, la mise en réseau des nœuds et l'exécution du même job MapReduce dans un environnement scalable.
-        </p>
-        <ul class="list">
-          <li>Lancement et sécurisation de 4 instances EC2</li>
-          <li>Configuration réseau privée, hosts et SSH</li>
-          <li>Déploiement de HDFS et YARN dans AWS</li>
-          <li>Exécution du job MapReduce CA par ville (Java + Python)</li>
-        </ul>
-        <div class="actions">
-          <a class="btn" href="tp3.html">Ouvrir le TP3</a>
-        </div>
-      </article>
-
-      <article class="card">
-        <div class="badge-row">
-          <span class="badge b1">TP4</span>
-          <span class="badge b4">Apache Hive 4.2.0</span>
-          <span class="badge b3">Docker &amp; Hue</span>
-        </div>
-        <h3>Apache Hive sur HDFS avec Hue (Docker)</h3>
-        <p>
-          Ce quatrième TP déploie un mini-cluster Hadoop (HDFS, YARN) complété par Apache Hive (metastore + HiveServer2) et l'interface Hue via Docker Compose.
-          Les données sont chargées dans HDFS, puis exploitées par des requêtes HiveQL d'agrégation (CA par ville, catégorie, moyen de paiement).
-        </p>
-        <ul class="list">
-          <li>Construction de l'image <code>hive-with-postgres:4.2.0</code></li>
-          <li>Démarrage de la stack <code>docker compose up -d</code></li>
-          <li>Préparation du warehouse HDFS et chargement de <code>purchases_hive.txt</code></li>
-          <li>Tables externes Hive et requêtes HQL d'analyse</li>
-        </ul>
-        <div class="actions">
-          <a class="btn secondary" href="tp4.html">Ouvrir le TP4</a>
-        </div>
-      </article>
-    </div>
-
-    <footer>
-      ISI — Institut Supérieur d'Informatique | Master 2 — Réseaux Informatiques | Big Data & Analyse de données | Portail des TPs
-    </footer>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html"><img src="logo.jpg" alt="Logo ISI"><span>Big Data — TP<small>ISI · Master 1 IAGE · 2026-2027</small></span></a>
+    <nav class="nav" aria-label="Navigation des TP">
+      <a href="index.html">Accueil</a>
+      <a href="tp1.html">TP1</a>
+      <a href="tp2.html">TP2</a>
+      <a href="tp3.html">TP3</a>
+      <a href="tp4.html">TP4</a>
+    </nav>
   </div>
+</header>
+
+<header class="doc-hero">
+  <div class="doc-hero-inner">
+    <div class="logo-tile"><img src="logo.jpg" alt="Logo ISI"></div>
+    <div>
+      <p class="eyebrow">Module Big Data &amp; Analyse de données</p>
+      <h1>Travaux pratiques Hadoop et Hive</h1>
+      <p class="lead">Quatre TP progressifs : installer Hadoop sur un poste, monter un cluster, le transposer dans le cloud, puis interroger les données en SQL. Fil rouge : les ventes d'une enseigne, analysées par ville, catégorie et moyen de paiement.</p>
+      <div class="chips">
+        <span class="chip"><b>Master 1 — IAGE</b></span>
+        <span class="chip">Informatique Appliquée à la Gestion des Entreprises</span>
+        <span class="chip">Année 2026-2027</span>
+        <span class="chip">Hadoop 3.4.3</span>
+        <span class="chip">Java 21 · Python 3</span>
+        <span class="chip">Hive 4.2.0</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <h2 class="section-title">Le parcours</h2>
+  <p class="section-sub">Chaque TP s'appuie sur le précédent. Faites-les dans l'ordre.</p>
+
+  <div class="tp-grid">
+    <article class="card tp-card">
+      <div class="tp-num">1</div>
+      <h3>Installer Hadoop en mode pseudo-distribué</h3>
+      <p>Tous les démons Hadoop sur une seule machine : le laboratoire de base du module.</p>
+      <div class="tp-q"><b>Question métier</b>Peut-on tester un traitement Big Data sans acheter de serveurs ?</div>
+      <ul>
+        <li>Java 21, SSH, utilisateur <code>hadoop</code></li>
+        <li>Configuration de HDFS, YARN et MapReduce</li>
+        <li>Validation par un job d'exemple</li>
+      </ul>
+      <div class="tags"><span class="tag">Hadoop 3.4.3</span><span class="tag">Ubuntu 24.04</span><span class="tag">Pseudo-distribué</span></div>
+      <a class="btn" href="tp1.html">Ouvrir le TP1 →</a>
+    </article>
+
+    <article class="card tp-card">
+      <div class="tp-num">2</div>
+      <h3>Déployer un cluster de 4 nœuds sur VirtualBox</h3>
+      <p>Un master et trois workers, la réplication ×3, et un premier job MapReduce métier.</p>
+      <div class="tp-q"><b>Question métier</b>Quel est le chiffre d'affaires par ville, par catégorie, par moyen de paiement ?</div>
+      <ul>
+        <li>Réseau host-only, hostnames, SSH</li>
+        <li>HDFS et YARN sur plusieurs nœuds</li>
+        <li><code>TotalSalesByCity</code> en Java et en Python</li>
+      </ul>
+      <div class="tags"><span class="tag">Cluster 4 nœuds</span><span class="tag">VirtualBox</span><span class="tag">MapReduce</span></div>
+      <a class="btn" href="tp2.html">Ouvrir le TP2 →</a>
+    </article>
+
+    <article class="card tp-card">
+      <div class="tp-num">3</div>
+      <h3>Transposer le cluster dans le cloud AWS</h3>
+      <p>Le même cluster et le même job, sur quatre instances EC2.</p>
+      <div class="tp-q"><b>Question métier</b>Que change le cloud : délai de mise en place, coût à l'heure, sécurité ?</div>
+      <ul>
+        <li>Instances EC2 et Security Group</li>
+        <li>Réseau privé, hosts et SSH</li>
+        <li>Job « CA par ville » en Java et en Python</li>
+      </ul>
+      <div class="tags"><span class="tag">AWS EC2</span><span class="tag">Cloud</span><span class="tag">OPEX</span></div>
+      <a class="btn" href="tp3.html">Ouvrir le TP3 →</a>
+    </article>
+
+    <article class="card tp-card">
+      <div class="tp-num">4</div>
+      <h3>Analyser les ventes en SQL avec Hive et Hue</h3>
+      <p>Une stack Docker Hadoop + Hive + Hue, et les indicateurs du TP2 en HiveQL.</p>
+      <div class="tp-q"><b>Question métier</b>Un analyste peut-il exploiter le Big Data avec le SQL qu'il connaît déjà ?</div>
+      <ul>
+        <li>Image Hive avec metastore PostgreSQL</li>
+        <li>Table externe sur HDFS</li>
+        <li>Requêtes d'agrégation et lecture métier</li>
+      </ul>
+      <div class="tags"><span class="tag">Hive 4.2.0</span><span class="tag">Hue</span><span class="tag">Docker</span></div>
+      <a class="btn" href="tp4.html">Ouvrir le TP4 →</a>
+    </article>
+  </div>
+
+  <h2 class="section-title">Avant de commencer</h2>
+  <p class="section-sub">Ce qu'il faut prévoir, et le lien entre les TP et les chapitres du cours.</p>
+  <div class="two-col">
+    <div class="card">
+      <h3>Matériel et comptes</h3>
+      <ul>
+        <li><strong>TP1 :</strong> Ubuntu 24.04 (machine ou VM), 8 Go de RAM recommandés.</li>
+        <li><strong>TP2 :</strong> VirtualBox et un poste de <strong>16 Go de RAM</strong> recommandés (4 VM de 2 Go).</li>
+        <li><strong>TP3 :</strong> un compte AWS. Les instances sont facturées à l'heure : arrêtez-les après chaque séance.</li>
+        <li><strong>TP4 :</strong> Docker Engine et Docker Compose V2, 8 Go de RAM disponibles pour Docker.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Lien avec le cours</h3>
+      <table class="map">
+        <thead><tr><th>TP</th><th>Chapitres</th></tr></thead>
+        <tbody>
+          <tr><td>TP1</td><td>Ch. 3 — HDFS et YARN</td></tr>
+          <tr><td>TP2</td><td>Ch. 2 — Architecture distribuée · Ch. 4 — MapReduce</td></tr>
+          <tr><td>TP3</td><td>Ch. 1 et 3 — Coûts, sur site ou cloud</td></tr>
+          <tr><td>TP4</td><td>Ch. 5 — Hive et Hue</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="box box-metier fil">
+    <strong>Fil rouge IAGE :</strong> à chaque TP, ne vous arrêtez pas à « le job a fonctionné ». Lisez le résultat comme un gestionnaire : quelle ville, quelle catégorie, quel moyen de paiement pèse le plus, et quelle décision cela pourrait éclairer ?
+  </div>
+</main>
+
+<footer class="site-footer" style="margin-top:32px">ISI — Institut Supérieur d'Informatique · Master 1 — IAGE · Big Data &amp; Analyse de données · Année universitaire 2026-2027</footer>
+<script src="assets/tp.js"></script>
 </body>
 </html>

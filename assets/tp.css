@@ -1,0 +1,334 @@
+/* ==========================================================================
+   Plateforme TP Big Data — ISI — Master 1 IAGE
+   Feuille de style commune (accueil + TP1 à TP4)
+   Palette alignée sur les supports de cours : bleu marine + orange
+   ========================================================================== */
+
+:root {
+  --navy: #1f3864;
+  --navy-2: #2c4f86;
+  --navy-tint: #eaf0f8;
+  --orange: #c55a11;
+  --orange-tint: #fbede6;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --border: #d9e1ec;
+  --bg: #f6f8fb;
+  --card: #ffffff;
+  --green: #1e7d4f;
+  --green-tint: #e6f4ec;
+  --blue: #1d6fb8;
+  --blue-tint: #e8f2fc;
+  --amber: #a15c00;
+  --amber-tint: #fff4df;
+
+  /* Blocs de code : fond marine et accents orange de la charte du cours */
+  --code-bg: #13233f;
+  --code-fg: #e4eaf4;
+  --code-border: #24385e;
+  --code-shell: #c55a11;
+  --code-xml: #a9c0de;
+  --code-java: #f4b183;
+  --code-python: #8fb8e8;
+  --code-yaml: #ffd98a;
+  --code-sql: #e07b39;
+  --code-docker: #6f9bd8;
+  --code-ini: #ffd98a;
+  --code-plain: #7f8fa9;
+  /* Coloration syntaxique */
+  --syn-cmd: #f4b183;      /* commandes, mots-clés : orange clair */
+  --syn-str: #a9c0de;      /* chaînes, valeurs : bleu clair */
+  --syn-var: #ffd98a;      /* variables, clés, propriétés : or */
+  --syn-num: #8fb8e8;      /* nombres, options, classes : bleu ciel */
+  --syn-com: #7f8fa9;      /* commentaires : gris bleuté */
+  --syn-punc: #aab6cb;     /* ponctuation */
+
+  --serif: "Source Serif 4", Cambria, Georgia, "Times New Roman", serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", Consolas, Monaco, "Courier New", monospace;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgba(15, 23, 42, .05), 0 8px 24px rgba(15, 23, 42, .06);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--navy-2); text-underline-offset: 2px; }
+a:hover { color: var(--orange); }
+img { max-width: 100%; }
+
+/* ---------- Barre de navigation ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(255, 255, 255, .92);
+  backdrop-filter: saturate(160%) blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1240px; margin: 0 auto; padding: 10px 20px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--navy); font-weight: 700; }
+.brand img { width: 34px; height: 34px; object-fit: contain; border-radius: 6px; background: #fff; border: 1px solid var(--border); }
+.brand small { display: block; font-weight: 500; color: var(--muted); font-size: 12px; line-height: 1.2; }
+.brand span { line-height: 1.2; font-size: 15px; }
+.nav { display: flex; gap: 4px; flex-wrap: wrap; }
+.nav a {
+  text-decoration: none; color: var(--navy); font-weight: 600; font-size: 14px;
+  padding: 7px 12px; border-radius: 8px;
+}
+.nav a:hover { background: var(--navy-tint); color: var(--navy); }
+.nav a.active { background: var(--navy); color: #fff; }
+
+/* ---------- En-tête de document ---------- */
+.doc-hero {
+  background: var(--navy);
+  color: #fff;
+}
+.doc-hero-inner {
+  max-width: 1240px; margin: 0 auto; padding: 36px 20px 32px;
+  display: grid; grid-template-columns: 96px 1fr; gap: 24px; align-items: center;
+}
+.doc-hero .logo-tile {
+  width: 96px; height: 96px; background: #fff; border-radius: 14px; padding: 8px;
+  display: flex; align-items: center; justify-content: center;
+}
+.doc-hero .logo-tile img { width: 100%; height: 100%; object-fit: contain; }
+.eyebrow {
+  text-transform: uppercase; letter-spacing: .12em; font-size: 12.5px; font-weight: 700; color: #f4b183; margin: 0 0 6px;
+}
+.doc-hero h1 {
+  font-family: var(--serif); font-weight: 600; font-size: clamp(26px, 3.4vw, 38px); line-height: 1.15; margin: 0 0 10px;
+}
+.doc-hero .lead { margin: 0; color: #d7e0ee; max-width: 820px; font-size: 16.5px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .22);
+  border-radius: 999px; padding: 4px 12px; font-size: 13px; color: #fff; white-space: nowrap;
+}
+.chip b { font-weight: 700; }
+
+/* ---------- Fiche du TP (cartes sous l'en-tête) ---------- */
+.brief {
+  max-width: 1240px; margin: -18px auto 0; padding: 0 20px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; position: relative;
+}
+.brief .card { padding: 16px 18px; }
+.brief h3 { margin: 0 0 4px; font-size: 12.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-family: var(--sans); }
+.brief p { margin: 0; font-size: 15px; }
+.brief .card.metier { background: var(--orange-tint); border-color: #f2cdb8; }
+.brief .card.metier h3 { color: var(--orange); }
+
+.card {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+}
+
+/* ---------- Mise en page document : sommaire + contenu ---------- */
+.doc-layout {
+  max-width: 1240px; margin: 28px auto 0; padding: 0 20px 40px;
+  display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 32px; align-items: start;
+}
+.toc {
+  position: sticky; top: 76px; max-height: calc(100vh - 96px); overflow: auto;
+  font-size: 14px; padding: 16px 14px;
+}
+.toc h2 { font-size: 12.5px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 0 0 8px; padding: 0 8px; border: 0; font-family: var(--sans); }
+.toc ol { list-style: none; margin: 0; padding: 0; }
+.toc li { margin: 0; }
+.toc a {
+  display: block; text-decoration: none; color: var(--text); padding: 5px 8px; border-radius: 6px; line-height: 1.35;
+  border-left: 3px solid transparent;
+}
+.toc a:hover { background: var(--navy-tint); }
+.toc a.current { color: var(--navy); font-weight: 600; border-left-color: var(--orange); background: var(--navy-tint); }
+
+.doc {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 8px 44px 36px; min-width: 0;
+}
+.doc > *:first-child { margin-top: 28px; }
+
+/* ---------- Titres ---------- */
+.doc h2 {
+  font-family: var(--serif); font-weight: 600; font-size: 26px; color: var(--navy); line-height: 1.25;
+  margin: 44px 0 14px; padding-top: 18px; border-top: 1px solid var(--border);
+}
+.doc > h2:first-of-type { border-top: 0; padding-top: 0; }
+.doc h3 { font-size: 19px; color: var(--navy-2); margin: 28px 0 10px; line-height: 1.3; }
+.doc h4 { font-size: 16.5px; color: var(--navy-2); margin: 22px 0 8px; }
+.doc p, .doc li { max-width: 78ch; }
+.doc ul, .doc ol { padding-left: 24px; }
+.doc li { margin-bottom: 6px; }
+.doc hr { display: none; }
+
+/* ---------- Code ---------- */
+code { font-family: var(--mono); font-size: .9em; }
+:not(pre) > code {
+  background: var(--navy-tint); color: #17325a; padding: 1px 6px; border-radius: 5px; border: 1px solid #d6e1f0;
+  overflow-wrap: anywhere;
+}
+.code-wrap { position: relative; margin: 14px 0 18px; }
+pre {
+  background: var(--code-bg); color: var(--code-fg);
+  border: 1px solid var(--code-border); border-left: 4px solid var(--code-shell); border-radius: 10px;
+  padding: 16px 18px; margin: 14px 0 18px;
+  overflow-x: auto; font-family: var(--mono); font-size: 13.5px; line-height: 1.6; tab-size: 4;
+  white-space: pre;
+}
+.code-wrap pre { margin: 0; padding-top: 30px; }
+pre code { background: transparent !important; color: inherit !important; padding: 0 !important; border: 0 !important; font-size: inherit; }
+pre.xml, pre:has(code.language-xml), pre:has(code.language-markup) { border-left-color: var(--code-xml); }
+pre.java, pre:has(code.language-java) { border-left-color: var(--code-java); }
+pre.python, pre:has(code.language-python) { border-left-color: var(--code-python); }
+pre.yaml, pre:has(code.language-yaml) { border-left-color: var(--code-yaml); }
+pre:has(code.language-sql) { border-left-color: var(--code-sql); }
+pre:has(code.language-dockerfile) { border-left-color: var(--code-docker); }
+pre:has(code.language-ini) { border-left-color: var(--code-ini); }
+pre.plain, pre:has(code:not([class*="language-"])) { border-left-color: var(--code-plain); }
+
+.code-tools {
+  position: absolute; top: 6px; right: 8px; left: 14px; display: flex; justify-content: space-between; align-items: center;
+  pointer-events: none;
+}
+.code-lang { font-family: var(--mono); font-size: 11px; color: #8a9bbb; text-transform: uppercase; letter-spacing: .08em; }
+.copy-btn {
+  pointer-events: auto; cursor: pointer;
+  background: rgba(255, 255, 255, .08); color: #d6deeb; border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 6px; font: 600 12px var(--sans); padding: 3px 9px;
+}
+.copy-btn:hover { background: rgba(255, 255, 255, .16); }
+.copy-btn.ok { background: var(--orange); border-color: var(--orange); color: #fff; }
+
+/* Coloration du shell (TP1/TP2, générée par tp.js) */
+.sh-cmd { color: var(--syn-cmd); font-weight: 600; }
+.sh-flag { color: var(--syn-num); }
+.sh-var { color: var(--syn-var); }
+.sh-str { color: var(--syn-str); }
+.sh-com { color: var(--syn-com); font-style: italic; }
+.sh-op { color: var(--syn-punc); }
+
+/* Coloration manuelle (TP1/TP2) */
+pre.xml .xml-tag { color: var(--syn-cmd); }
+pre.xml .xml-attr { color: var(--syn-var); }
+pre.xml .xml-str { color: var(--syn-str); }
+pre.xml .xml-com { color: var(--syn-com); font-style: italic; }
+pre.java .ij-kw { color: var(--syn-cmd); font-weight: 600; }
+pre.java .ij-cls { color: var(--syn-num); }
+pre.java .ij-met { color: var(--syn-var); }
+pre.java .ij-var { color: var(--code-fg); }
+pre.java .ij-str { color: var(--syn-str); }
+pre.java .ij-num { color: var(--syn-num); }
+pre.python .py-kw { color: var(--syn-cmd); font-weight: 600; }
+pre.python .py-str { color: var(--syn-str); }
+pre.python .py-com { color: var(--syn-com); font-style: italic; }
+
+/* Coloration Prism (TP3/TP4) */
+code[class*="language-"] .token.comment, code[class*="language-"] .token.prolog,
+code[class*="language-"] .token.doctype, code[class*="language-"] .token.cdata { color: var(--syn-com); font-style: italic; }
+code[class*="language-"] .token.punctuation { color: var(--syn-punc); }
+code[class*="language-"] .token.property, code[class*="language-"] .token.constant,
+code[class*="language-"] .token.symbol, code[class*="language-"] .token.key, code[class*="language-"] .token.atrule,
+code[class*="language-"] .token.attr-name, code[class*="language-"] .token.variable,
+code[class*="language-"] .token.environment, code[class*="language-"] .token.assign-left { color: var(--syn-var); }
+code[class*="language-"] .token.tag { color: var(--syn-cmd); }
+code[class*="language-"] .token.string, code[class*="language-"] .token.char,
+code[class*="language-"] .token.attr-value, code[class*="language-"] .token.inserted { color: var(--syn-str); }
+code[class*="language-"] .token.boolean, code[class*="language-"] .token.number { color: var(--syn-num); }
+code[class*="language-"] .token.operator, code[class*="language-"] .token.entity,
+code[class*="language-"] .token.url { color: var(--syn-punc); }
+code[class*="language-"] .token.parameter { color: var(--syn-num); }
+code[class*="language-"] .token.keyword, code[class*="language-"] .token.important,
+code[class*="language-"] .token.function { color: var(--syn-cmd); font-weight: 600; }
+code[class*="language-"] .token.class-name, code[class*="language-"] .token.builtin { color: var(--syn-num); }
+code[class*="language-"] .token.selector { color: var(--syn-var); }
+code.language-ini .token.selector { color: var(--syn-cmd); font-weight: 600; }
+code.language-dockerfile .token.instruction, code.language-docker .token.instruction { color: var(--syn-cmd); font-weight: 700; }
+
+/* ---------- Tableaux ---------- */
+.table-wrap { overflow-x: auto; margin: 14px 0 20px; border: 1px solid var(--border); border-radius: 10px; }
+table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+.table-wrap table { margin: 0; }
+th { background: var(--navy); color: #fff; text-align: left; font-weight: 600; padding: 9px 12px; }
+td { padding: 9px 12px; border-top: 1px solid var(--border); vertical-align: top; }
+tbody tr:nth-child(even) { background: #f8fafd; }
+
+/* ---------- Encadrés ---------- */
+.box {
+  border: 1px solid; border-left-width: 5px; border-radius: 10px; padding: 12px 16px; margin: 16px 0 20px;
+}
+.box > :first-child { margin-top: 0; }
+.box > :last-child { margin-bottom: 0; }
+.box-info { background: var(--blue-tint); border-color: #b9d6f2; border-left-color: var(--blue); color: #12395f; }
+.box-warning, .box-warn { background: var(--amber-tint); border-color: #f1d7a8; border-left-color: #e08a00; color: #5f3b00; }
+.box-success { background: var(--green-tint); border-color: #b9dfc9; border-left-color: var(--green); color: #134b31; }
+.box-metier { background: var(--orange-tint); border-color: #f2cdb8; border-left-color: var(--orange); color: #5a2a08; }
+.box-metier strong:first-child { color: var(--orange); }
+
+/* ---------- Badges (versions) ---------- */
+.badge { display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: .82em; font-weight: 700; color: #fff; vertical-align: middle; background: var(--navy-2); }
+.badge-hadoop { background: #d9761f; }
+.badge-java { background: #c0392b; }
+.badge-python { background: #3776ab; }
+
+/* ---------- Diagrammes Mermaid ---------- */
+.mermaid-container {
+  background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 12px;
+  padding: 24px; margin: 18px 0; text-align: center; overflow-x: auto;
+}
+.mermaid-container pre.mermaid { background: transparent; border: 0; color: #e5e7eb; text-align: center; margin: 0; white-space: pre; }
+.mermaid-container svg { max-width: 100%; height: auto; }
+.mermaid-container .flowchart-link { stroke: #f4b183 !important; }
+.mermaid-container marker path { fill: #7dd3fc !important; stroke: #f4b183 !important; }
+.mermaid-container .edgeLabel { color: #e5e7eb !important; background-color: var(--code-bg) !important; padding: 2px 6px !important; }
+.mermaid-container .cluster-label { color: #e5e7eb !important; }
+.archi-legend { font-size: 14.5px; color: #374151; margin: 8px 0 18px; }
+
+/* ---------- Navigation bas de page + pied ---------- */
+.pager {
+  display: flex; justify-content: space-between; gap: 12px; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border);
+}
+.pager a {
+  flex: 1; text-decoration: none; border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; color: var(--navy);
+}
+.pager a:hover { border-color: var(--navy-2); background: var(--navy-tint); }
+.pager small { display: block; color: var(--muted); font-size: 12.5px; }
+.pager .next { text-align: right; }
+.site-footer {
+  text-align: center; color: var(--muted); font-size: 13.5px; padding: 8px 20px 36px;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 980px) {
+  .doc-layout { grid-template-columns: 1fr; }
+  .toc { position: static; max-height: none; }
+}
+@media (max-width: 640px) {
+  .doc { padding: 4px 18px 24px; }
+  .doc-hero-inner { grid-template-columns: 1fr; }
+  .doc-hero .logo-tile { width: 72px; height: 72px; }
+  pre { font-size: 12.5px; }
+}
+
+/* ---------- Impression (A4) ---------- */
+@page { size: A4 portrait; margin: 1.8cm; }
+@media print {
+  body { background: #fff; font-size: 10.5pt; }
+  .topbar, .toc, .copy-btn, .pager { display: none !important; }
+  .doc-hero { background: #fff; color: var(--navy); border-bottom: 2px solid var(--navy); }
+  .doc-hero .lead, .eyebrow { color: var(--text); }
+  .chip { color: var(--navy); border-color: var(--border); background: #fff; }
+  .brief { margin-top: 12px; }
+  .doc-layout { display: block; margin: 12px 0 0; padding: 0; }
+  .doc, .card { box-shadow: none; border: 0; padding: 0; }
+  pre { white-space: pre-wrap; font-size: 8.5pt; break-inside: avoid; }
+  .doc h2 { break-after: avoid; }
+}
