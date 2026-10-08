@@ -30,7 +30,7 @@
       <p class="eyebrow">Travaux pratiques n°4 · Big Data &amp; Analyse de données</p>
       <h1>Analyser les ventes en SQL avec Apache Hive et Hue</h1>
       <p class="lead">Un mini-cluster Hadoop sous Docker, complété par Hive (metastore PostgreSQL + HiveServer2) et l'interface Hue : les mêmes indicateurs qu'au TP2, en quelques lignes de SQL.</p>
-      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Apache Hive 4.2.0</span><span class="chip">Hadoop 3.2.1 (conteneurs)</span><span class="chip">Hue</span><span class="chip">Docker Compose V2</span><span class="chip">Version 2.0 · Octobre 2026</span></div>
+      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Apache Hive 4.2.0</span><span class="chip">Hadoop 3.2.1 (conteneurs)</span><span class="chip">Hue</span><span class="chip">Docker Compose V2</span><span class="chip">Octobre 2026</span></div>
     </div>
   </div>
 </header>
@@ -45,9 +45,9 @@
       <li>comprendre le rôle du <strong>metastore</strong> (ici backed par <strong>PostgreSQL</strong>) et celui de <strong>HiveServer2</strong> pour l'exécution de requêtes SQL ;</li>
       <li>préparer le <strong>warehouse</strong> Hive sur HDFS et <strong>charger</strong> des fichiers texte (TSV ou CSV) ;</li>
       <li>créer des <strong>tables</strong> Hive (gérées ou externes) et exécuter des requêtes d'<strong>agrégation</strong> et de filtrage ;</li>
-      <li>(bonus) exprimer en <strong>HiveQL</strong> une logique équivalente au job MapReduce <em>TotalSalesByCategory</em> du TP2.</li>
+      <li>(bonus) exprimer en <strong>HiveQL</strong> la même analyse que le job MapReduce « CA par catégorie » écrit dans l’analyse 2 du TP2.</li>
     </ul>
-    <p>Les fichiers de référence du dépôt pour ce TP se trouvent sous <code>tp4/hadoop-hive-hue/</code> : <code>docker-compose.yml</code>, <code>hue/hue.ini</code> et <code>Dockerfile.hive</code>. Leur <strong>contenu intégral</strong> est également reproduit en <strong>section 4</strong> (copie à maintenir alignée sur le dépôt).</p>
+    <p>Le TP repose sur trois fichiers dont le <strong>contenu intégral</strong> est donné en <strong>section 4</strong> : <code>Dockerfile.hive</code>, <code>docker-compose.yml</code> et <code>hue/hue.ini</code>. Vous les créerez dans un dossier de travail <code>hadoop-hive-hue/</code>.</p>
 <h2 id="2-prerequis">2. Prérequis</h2>
 
     <h3>2.1 Minimum (toute machine hôte)</h3>
@@ -57,8 +57,8 @@
       <li>Notions de <strong>SQL</strong> et rappels du <a href="tp2.html">TP2</a> sur le format tabulé de <code>purchases.txt</code> (ville, catégorie, montant, moyen de paiement).</li>
     </ul>
 
-    <h3>2.2 Référence VM Ubuntu (alignée sur history.txt)</h3>
-    <p>L'environnement de référence du TP a été préparé sur une <strong>VM Ubuntu</strong> (journal shell conservé dans <code>tp4/history.txt</code>). Les étapes ci-dessous condensent l'installation <strong>Docker</strong> via le dépôt officiel, comme dans cet historique (hors parties données externes non reprises ici).</p>
+    <h3>2.2 Installation de Docker sur Ubuntu</h3>
+    <p>Sur une machine ou une VM <strong>Ubuntu</strong>, installez <strong>Docker</strong> depuis le dépôt officiel de Docker :</p>
 
 <pre><code class="language-bash">sudo apt update
 sudo apt install -y ca-certificates curl gnupg lsb-release
@@ -74,7 +74,7 @@ https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
 sudo apt update
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin</code></pre>
 
-    <p>Puis ajoutez votre utilisateur au groupe <code>docker</code> (équivalent à <code>sudo usermod -aG docker $USER</code> dans l'historique) :</p>
+    <p>Puis ajoutez votre utilisateur au groupe <code>docker</code> :</p>
 
 <pre><code class="language-bash">sudo usermod -aG docker "$USER"</code></pre>
 
@@ -84,7 +84,7 @@ sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin<
 
 <pre><code class="language-bash">sudo apt install -y unzip</code></pre>
 
-    <p>Les fichiers <code>docker-compose.yml</code> et <code>hue.ini</code> ont été édités avec <strong><code>nano</code></strong> dans la même trace ; tout éditeur texte convient.</p>
+    <p>Pour créer les fichiers de la section 4, utilisez l'éditeur de votre choix (<code>nano</code>, VS Code…).</p>
 <h2 id="3-architecture-de-la-stack">3. Architecture de la stack</h2>
     <p>Les services définis dans le Compose communiquent sur un réseau Docker <code>hadoop-net</code>. Les ports exposés sur la machine hôte permettent d'accéder aux interfaces web et au JDBC Hive.</p>
 
@@ -141,16 +141,20 @@ flowchart LR
         <tr><td>HiveServer2 JDBC</td><td>10000</td><td>Beeline, clients JDBC</td></tr>
         <tr><td>HiveServer2 Web UI</td><td>10002</td><td>http://localhost:10002</td></tr>
         <tr><td>Hue</td><td>8888</td><td>http://localhost:8888</td></tr>
-        <tr><td>Postgres metastore</td><td>5433</td><td>debug JDBC depuis l'hôte</td></tr>
-        <tr><td>Postgres Hue</td><td>5434</td><td>debug JDBC depuis l'hôte</td></tr>
       </tbody>
     </table>
 <h2 id="4-fichiers-de-la-stack-contenu-integral">4. Fichiers de la stack (contenu intégral)</h2>
-    <p>Ci-dessous, <strong>copie</strong> des fichiers présents dans le dépôt sous <code>tp4/hadoop-hive-hue/</code>. En cas de divergence avec votre copie locale, <strong>les fichiers du dépôt font foi</strong> ; toute modification dans le dépôt doit être <strong>reproduite ici manuellement</strong> pour garder l'énoncé aligné.</p>
+    <p>Créez un dossier de travail <code>hadoop-hive-hue/</code> avec l'arborescence suivante, puis recopiez-y le contenu des trois fichiers ci-dessous :</p>
+<pre class="plain">hadoop-hive-hue/
+├── Dockerfile.hive
+├── docker-compose.yml
+├── hue/
+│   └── hue.ini
+└── transactions/          ← données du TP (section 7.2)</pre>
 
     <h3>4.1 Dockerfile.hive</h3>
 <pre><code class="language-dockerfile"># Image Hive 4.2.0 avec pilote JDBC PostgreSQL pour le metastore distant.
-# Construction : depuis ce répertoire (tp4/hadoop-hive-hue)
+# Construction : depuis le dossier hadoop-hive-hue
 #   docker build -f Dockerfile.hive -t hive-with-postgres:4.2.0 .
 #
 # L'image officielle apache/hive n'embarque pas le JAR Postgres dans le classpath
@@ -377,7 +381,7 @@ options='{"url": "http://hive-server2:10000", "driver": "hive"}'</code></pre>
 <h2 id="5-construction-de-l-image-hive-hive-with-postgres-4-2-0">5. Construction de l'image Hive (hive-with-postgres:4.2.0)</h2>
     <p>Le fichier <code>Dockerfile.hive</code> part de l'image officielle <strong><code>apache/hive:4.2.0</code></strong> et ajoute le pilote <strong>JDBC PostgreSQL</strong> dans <code>/opt/hive/lib/</code>, nécessaire lorsque le metastore est configuré avec <code>org.postgresql.Driver</code> (variables <code>SERVICE_OPTS</code> du Compose). Le contenu intégral du Dockerfile est repris en <strong>section 4.1</strong>.</p>
 
-    <p>Depuis le répertoire <strong><code>tp4/hadoop-hive-hue</code></strong> :</p>
+    <p>Depuis le dossier <strong><code>hadoop-hive-hue</code></strong> :</p>
 
 <pre><code class="language-bash">docker build -f Dockerfile.hive -t hive-with-postgres:4.2.0 .</code></pre>
 
@@ -387,7 +391,7 @@ options='{"url": "http://hive-server2:10000", "driver": "hive"}'</code></pre>
       <li>Le tag <strong><code>hive-with-postgres:4.2.0</code></strong> doit correspondre exactement aux services <code>hive-metastore</code> et <code>hive-server2</code> du <code>docker-compose.yml</code>.</li>
     </ul>
 <h2 id="6-demarrage-du-cluster">6. Démarrage du cluster</h2>
-    <p>Toujours depuis <strong><code>tp4/hadoop-hive-hue</code></strong> :</p>
+    <p>Toujours depuis <strong><code>hadoop-hive-hue</code></strong> :</p>
 
 <pre><code class="language-bash">docker compose up -d
 docker compose ps</code></pre>
@@ -416,12 +420,12 @@ exit</code></pre>
     <ul>
       <li>en priorité <strong><code>purchases_hive.txt</code></strong> (séparateur <code>;</code>) pour le cas guidé de ce TP ;</li>
       <li>ou une copie du fichier <strong><code>purchases.txt</code></strong> du <a href="tp2.html">TP2</a> (séparateur tabulation), pour des exercices alignés avec le cours ;</li>
-      <li>ou tout fichier <strong>CSV</strong> ou tabulé fourni par l'enseignant, placé dans <code>tp4/hadoop-hive-hue/transactions/</code> sur la machine hôte (visible sous <code>/transactions</code> dans le namenode).</li>
+      <li>ou tout fichier <strong>CSV</strong> ou tabulé fourni par l'enseignant, placé dans <code>hadoop-hive-hue/transactions/</code> sur la machine hôte (visible sous <code>/transactions</code> dans le namenode).</li>
     </ul>
 
-    <p>Dans ce TP, le cas principal est <strong><code>purchases_hive.txt</code></strong>. Ce fichier volumineux n’est <strong>pas versionné</strong> dans le dépôt (voir <code>.gitignore</code>) : il est <strong>fourni par l’enseignant</strong> et doit être copié dans <code>tp4/hadoop-hive-hue/transactions/</code>.</p>
+    <p>Dans ce TP, le cas principal est <strong><code>purchases_hive.txt</code></strong>. Ce fichier est <strong>fourni par l’enseignant</strong> : copiez-le dans <code>hadoop-hive-hue/transactions/</code>.</p>
     <ul>
-      <li>chemin : <code>tp4/hadoop-hive-hue/transactions/purchases_hive.txt</code> ;</li>
+      <li>chemin : <code>hadoop-hive-hue/transactions/purchases_hive.txt</code> ;</li>
       <li>format observé : <code>date;heure;ville;categorie;montant;paiement</code> ;</li>
       <li>séparateur : point-virgule <code>;</code>.</li>
     </ul>
@@ -440,7 +444,7 @@ exit</code></pre>
     <h3>8.1 Hue</h3>
 
     <h4>Vérification avant connexion</h4>
-    <p>Depuis <code>tp4/hadoop-hive-hue</code>, confirmez que les services nécessaires sont démarrés :</p>
+    <p>Depuis <code>hadoop-hive-hue</code>, confirmez que les services nécessaires sont démarrés :</p>
 
 <pre><code class="language-bash">docker compose ps</code></pre>
 
@@ -517,7 +521,7 @@ FROM retail_db.purchases_hive_ext
 GROUP BY city
 ORDER BY total_ca DESC;</code></pre>
 
-    <p><strong>2. CA total par catégorie</strong> (équivalent logique de <code>TotalSalesByCategory</code>)</p>
+    <p><strong>2. CA total par catégorie</strong> (même analyse que le job MapReduce de l’analyse 2 du TP2)</p>
 <pre><code class="language-sql">SELECT category, ROUND(SUM(amount), 2) AS total_ca
 FROM retail_db.purchases_hive_ext
 GROUP BY category
@@ -560,10 +564,10 @@ GROUP BY city
 ORDER BY total_ca_matin DESC
 LIMIT 10;</code></pre>
 
-    <div class="box box-metier"><strong>Pour un profil IAGE :</strong> pour chaque requête, rédigez une phrase de lecture <em>métier</em> du résultat, comme dans une note à une direction commerciale (ex. « les trois premières villes concentrent X % du chiffre d’affaires »).</div>
+    <div class="box box-metier"><strong>Lecture métier :</strong> pour chaque requête, rédigez une phrase de lecture <em>métier</em> du résultat, comme dans une note à une direction commerciale (ex. « les trois premières villes concentrent X % du chiffre d’affaires »).</div>
 
     <h3>9.4 Bonus — Comparaison avec le job MapReduce</h3>
-    <p>Le job Java <code>TotalSalesByCategory.java</code> (ou son équivalent Python Streaming) agrège la somme des montants par catégorie. Comparez son résultat avec la requête HQL de la section 9.3.2.</p>
+    <p>Dans l’analyse 2 du TP2, vous avez écrit un job MapReduce (Java ou Python) qui calcule le CA par catégorie. Comparez son résultat avec la requête HQL n°2 de la section 9.3, puis comparez l’effort nécessaire pour obtenir le même résultat dans les deux cas.</p>
 <h2 id="10-livrable-attendu">10. Livrable attendu</h2>
     <p>Un court rapport (PDF ou Markdown) contenant :</p>
     <ul>
@@ -595,12 +599,11 @@ docker logs hive-server2 --tail=80</code></pre>
       </li>
       <li>
         <p><strong>Tez / moteur d'exécution</strong><br>
-        Le Compose fixe <code>hive.execution.engine=tez</code> côté HiveServer2. Si une requête échoue faute de Tez, notez le message d'erreur ; en TP, une piste de contournement documentée consiste à exécuter en moteur <strong>MR</strong> pour les requêtes simples (<code>SET hive.execution.engine=mr;</code>) <strong>uniquement si</strong> votre image et classpath le permettent — à valider avec votre enseignant si le cluster Docker ne fournit pas Tez correctement.</p>
+        Le Compose fixe <code>hive.execution.engine=tez</code> côté HiveServer2. Si une requête échoue avec un message mentionnant Tez, notez le message d'erreur et signalez-le à l'enseignant.</p>
       </li>
     </ul>
 <h2 id="12-references-rapides">12. Références rapides</h2>
     <ul>
-      <li>Fichiers du TP : <code>tp4/hadoop-hive-hue/docker-compose.yml</code>, <code>tp4/hadoop-hive-hue/hue/hue.ini</code>, <code>tp4/hadoop-hive-hue/Dockerfile.hive</code>.</li>
       <li>Documentation Apache : <a href="https://cwiki.apache.org/confluence/display/Hive/Setting+Up+Hive+with+Docker" target="_blank" rel="noopener">Setting Up Hive with Docker</a> (informations générales sur l'image <code>apache/hive</code>).</li>
     </ul>
 <div class="pager"><a class="prev" href="tp3.html"><small>← Précédent</small>TP3 — Cluster sur AWS EC2</a><span></span></div>

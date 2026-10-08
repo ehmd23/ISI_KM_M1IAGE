@@ -30,7 +30,7 @@
       <p class="eyebrow">Travaux pratiques n°3 · Big Data &amp; Analyse de données</p>
       <h1>Déployer le cluster Hadoop dans le cloud AWS (EC2)</h1>
       <p class="lead">Le même cluster de 4 nœuds que dans le TP2, mais sur des instances EC2 louées à l'heure — et le même job MapReduce pour comparer.</p>
-      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Hadoop 3.4.3</span><span class="chip">Java 21</span><span class="chip">Python 3</span><span class="chip">Ubuntu 24.04 LTS</span><span class="chip">AWS EC2</span><span class="chip">Version 2.0 · Octobre 2026</span></div>
+      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Hadoop 3.4.3</span><span class="chip">Java 21</span><span class="chip">Python 3</span><span class="chip">Ubuntu 24.04 LTS</span><span class="chip">AWS EC2</span><span class="chip">Octobre 2026</span></div>
     </div>
   </div>
 </header>
@@ -141,7 +141,7 @@ export HADOOP_LOG_DIR=/tmp/hadoop-logs
   &lt;/property&gt;
 &lt;/configuration&gt;
 </code></pre>
-<p><strong>Note</strong> : <code>master</code> est résolu grâce au fichier <code>/etc/hosts</code> de l’étape 1 (même convention que <code>yarn.resourcemanager.hostname</code> et que dans le TP2).</p>
+<p><strong>Note</strong> : <code>master</code> est résolu grâce au fichier <code>/etc/hosts</code> de l’étape 1 (comme dans le TP2).</p>
 <h3>hdfs-site.xml</h3>
 <pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
 &lt;configuration&gt;
@@ -267,13 +267,13 @@ hdfs dfsadmin -report
 <h3>Projet Maven</h3>
 <pre><code class="language-bash">sudo apt install maven -y
 
-mvn archetype:generate -DgroupId=sn.ehmd -DartifactId=totalSales \
+mvn archetype:generate -DgroupId=sn.isi.bigdata -DartifactId=totalSales \
   -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
 cd totalSales
 
 # L'archétype génère une classe App et un test JUnit inutiles ici :
 # on les supprime (le pom.xml ci-dessous ne déclare pas JUnit).
-rm -rf src/test src/main/java/sn/ehmd/App.java</code></pre>
+rm -rf src/test src/main/java/sn/isi/bigdata/App.java</code></pre>
 <h3>pom.xml complet</h3>
 <pre><code class="language-markup">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
 &lt;project xmlns="http://maven.apache.org/POM/4.0.0"
@@ -281,7 +281,7 @@ rm -rf src/test src/main/java/sn/ehmd/App.java</code></pre>
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"&gt;
   &lt;modelVersion&gt;4.0.0&lt;/modelVersion&gt;
 
-  &lt;groupId&gt;sn.ehmd&lt;/groupId&gt;
+  &lt;groupId&gt;sn.isi.bigdata&lt;/groupId&gt;
   &lt;artifactId&gt;totalSales&lt;/artifactId&gt;
   &lt;version&gt;1.0-SNAPSHOT&lt;/version&gt;
 
@@ -304,8 +304,8 @@ rm -rf src/test src/main/java/sn/ehmd/App.java</code></pre>
   &lt;/dependencies&gt;
 &lt;/project&gt;</code></pre>
 <h3>TotalSalesByCity.java</h3>
-<p>À créer dans <code>src/main/java/sn/ehmd/TotalSalesByCity.java</code>. Le mapper lit le format tabulé de <code>purchases.txt</code> : ville en index 2, montant en index 4.</p>
-<pre><code class="language-java">package sn.ehmd;
+<p>À créer dans <code>src/main/java/sn/isi/bigdata/TotalSalesByCity.java</code>. Le mapper lit le format tabulé de <code>purchases.txt</code> : ville en index 2, montant en index 4.</p>
+<pre><code class="language-java">package sn.isi.bigdata;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -384,13 +384,13 @@ public class TotalSalesByCity {
 hdfs dfs -mkdir -p /input
 hdfs dfs -put purchases.txt /input/
 
-hadoop jar target/totalSales-1.0-SNAPSHOT.jar sn.ehmd.TotalSalesByCity /input/purchases.txt /output-ca
+hadoop jar target/totalSales-1.0-SNAPSHOT.jar sn.isi.bigdata.TotalSalesByCity /input/purchases.txt /output-ca
 
 hdfs dfs -cat /output-ca/part-r-00000
 </code></pre>
 
 <h3>Variante Python — Hadoop Streaming</h3>
-<p>Sur AWS, réutilisez les scripts du TP2 (<code>src/main/python/</code> du dépôt) : copiez-les depuis votre poste avec <code>scp -i votre-cle.pem *.py ubuntu@&lt;Public-DNS&gt;:/tmp/</code>, puis sur le master <code>sudo cp /tmp/*.py ~hadoop/ &amp;&amp; sudo chown hadoop:hadoop ~hadoop/*.py</code>.</p>
+<p>Sur AWS, réutilisez les deux scripts Python écrits au TP2 (mapper et reducer du CA par ville) : copiez-les depuis votre poste avec <code>scp -i votre-cle.pem *.py ubuntu@&lt;Public-DNS&gt;:/tmp/</code>, puis sur le master <code>sudo cp /tmp/*.py ~hadoop/ &amp;&amp; sudo chown hadoop:hadoop ~hadoop/*.py</code>.</p>
 <pre><code class="language-bash"># Sur le master, avec Python 3 installé sur tous les nœuds
 chmod +x total_sales_by_city_mapper.py total_sales_by_city_reducer.py
 

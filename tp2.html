@@ -30,7 +30,7 @@
       <p class="eyebrow">Travaux pratiques n°2 · Big Data &amp; Analyse de données</p>
       <h1>Déployer un cluster Hadoop de 4 nœuds sur VirtualBox</h1>
       <p class="lead">Passer d'une machine à un vrai cluster (1 master + 3 workers), puis calculer le chiffre d'affaires par ville avec MapReduce, en Java et en Python.</p>
-      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Hadoop 3.4.3</span><span class="chip">Java 21</span><span class="chip">Python 3</span><span class="chip">Ubuntu 24.04 LTS</span><span class="chip">Version 2.0 · Octobre 2026</span></div>
+      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Hadoop 3.4.3</span><span class="chip">Java 21</span><span class="chip">Python 3</span><span class="chip">Ubuntu 24.04 LTS</span><span class="chip">Octobre 2026</span></div>
     </div>
   </div>
 </header>
@@ -348,13 +348,13 @@ EOF</pre>
   <p>Sur <strong>master</strong>. Maven n’est pas installé par défaut sur Ubuntu.</p>
   <pre>sudo apt install maven -y
 
-mvn archetype:generate -DgroupId=sn.ehmd -DartifactId=totalSales \
+mvn archetype:generate -DgroupId=sn.isi.bigdata -DartifactId=totalSales \
   -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
 cd totalSales
 
 # L'archétype génère une classe App et un test JUnit inutiles ici :
 # on les supprime (le pom.xml ci-dessous ne déclare pas JUnit).
-rm -rf src/test src/main/java/sn/ehmd/App.java</pre>
+rm -rf src/test src/main/java/sn/isi/bigdata/App.java</pre>
 
   <h3>11.3 pom.xml</h3>
   <p>Remplacez le contenu du fichier <code>pom.xml</code> généré par :</p>
@@ -364,7 +364,7 @@ rm -rf src/test src/main/java/sn/ehmd/App.java</pre>
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"&gt;
   &lt;modelVersion&gt;4.0.0&lt;/modelVersion&gt;
 
-  &lt;groupId&gt;sn.ehmd&lt;/groupId&gt;
+  &lt;groupId&gt;sn.isi.bigdata&lt;/groupId&gt;
   &lt;artifactId&gt;totalSales&lt;/artifactId&gt;
   &lt;version&gt;1.0-SNAPSHOT&lt;/version&gt;
 
@@ -388,8 +388,8 @@ rm -rf src/test src/main/java/sn/ehmd/App.java</pre>
 &lt;/project&gt;</pre>
 
   <h3>11.4 TotalSalesByCity.java</h3>
-  <p>À créer dans <code>src/main/java/sn/ehmd/TotalSalesByCity.java</code>.</p>
-  <pre class="java"><span class="ij-kw">package</span> sn.ehmd;
+  <p>À créer dans <code>src/main/java/sn/isi/bigdata/TotalSalesByCity.java</code>.</p>
+  <pre class="java"><span class="ij-kw">package</span> sn.isi.bigdata;
 
 <span class="ij-kw">import</span> org.apache.hadoop.conf.<span class="ij-cls">Configuration</span>;
 <span class="ij-kw">import</span> org.apache.hadoop.fs.<span class="ij-cls">Path</span>;
@@ -455,16 +455,14 @@ rm -rf src/test src/main/java/sn/ehmd/App.java</pre>
 hdfs dfs -mkdir -p /input
 hdfs dfs -put purchases.txt /input/
 
-hadoop jar target/totalSales-1.0-SNAPSHOT.jar sn.ehmd.TotalSalesByCity /input/purchases.txt /output-ca
+hadoop jar target/totalSales-1.0-SNAPSHOT.jar sn.isi.bigdata.TotalSalesByCity /input/purchases.txt /output-ca
 
 hdfs dfs -cat /output-ca/part-r-00000</pre>
 
   <h3>11.6 Variante Python — Hadoop Streaming</h3>
   <p>
     Hadoop Streaming permet d’écrire le mapper et le reducer en <strong>Python</strong> (ou tout autre langage
-    lisant <code>stdin</code> / écrivant sur <code>stdout</code>). Les scripts de référence se trouvent dans
-    <code>src/main/python/</code> du dépôt du cours : copiez-les sur <strong>master</strong> (avec <code>scp</code>)
-    ou recréez-les avec <code>nano</code> à partir du contenu ci-dessous.
+    lisant <code>stdin</code> / écrivant sur <code>stdout</code>). Créez les deux scripts suivants sur <strong>master</strong> avec <code>nano</code>.
   </p>
   <div class="box box-info">
     <strong>Prérequis :</strong> Python 3 doit être installé sur <strong>tous</strong> les nœuds
@@ -546,7 +544,7 @@ hdfs dfs -cat /output-ca-py/part-*</pre>
   <h3>11.7 Analyses complémentaires (même jeu de données)</h3>
   <p>Après le job <strong>TotalSalesByCity</strong> (CA total par ville), vous réutilisez le <strong>même</strong> fichier <code>purchases.txt</code> en entrée HDFS. Chaque analyse consiste à adapter le couple <strong>clé / valeur</strong> émis par le mapper (et si besoin le type de la valeur) tout en conservant le principe d’<strong>agrégation par clé</strong> dans le reducer. Vous interprétez ensuite les sorties produites sur le cluster.</p>
   <p>Rappel sur les champs (séparateur tabulation <code>\t</code>) : date, heure, <strong>ville</strong> (index 2), <strong>catégorie</strong> (index 3), <strong>montant</strong> (index 4), <strong>moyen de paiement</strong> (index 5).</p>
-  <p>Vous pouvez réaliser ces analyses en <strong>Java</strong> <em>ou</em> en <strong>Python</strong> (Hadoop Streaming). Des mappers Python prêts à l’emploi sont fournis dans <code>src/main/python/</code> (<code>total_sales_by_payment_mapper.py</code>, <code>total_sales_by_category_mapper.py</code>, <code>transaction_count_by_city_mapper.py</code>) avec le reducer générique <code>sum_reducer.py</code>.</p>
+  <p>Vous pouvez réaliser ces analyses en <strong>Java</strong> <em>ou</em> en <strong>Python</strong> (Hadoop Streaming). Les programmes sont <strong>à écrire vous-même</strong>, en partant du job « CA par ville » : identifiez ce qui change d’une analyse à l’autre (la clé, la valeur émise) et ce qui peut rester identique. Demandez-vous en particulier si le reducer du CA par ville peut être réutilisé tel quel.</p>
 
   <div class="box box-info">
     <strong>Entrée et sorties HDFS :</strong> gardez <code>/input/purchases.txt</code> comme entrée commune. Pour chaque nouveau job, utilisez un <strong>répertoire de sortie distinct</strong> (HDFS refuse d’écraser un dossier déjà existant), par exemple <code>/output-ca-paiement</code>, <code>/output-ca-categorie</code>, <code>/output-nb-par-ville</code> (ajoutez un suffixe <code>-py</code> pour les jobs Python). Supprimez ou choisissez un autre chemin si besoin : <code>hdfs dfs -rm -r -f &lt;chemin&gt;</code>.
