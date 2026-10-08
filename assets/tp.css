@@ -193,7 +193,7 @@ pre.yaml, pre:has(code.language-yaml) { border-left-color: var(--code-yaml); }
 pre:has(code.language-sql) { border-left-color: var(--code-sql); }
 pre:has(code.language-dockerfile) { border-left-color: var(--code-docker); }
 pre:has(code.language-ini) { border-left-color: var(--code-ini); }
-pre.plain, pre:has(code:not([class*="language-"])) { border-left-color: var(--code-plain); }
+pre.plain, pre:has(code:not([class*="language-"]):not([class^="hl-"])) { border-left-color: var(--code-plain); }
 
 .code-tools {
   position: absolute; top: 6px; right: 8px; left: 14px; display: flex; justify-content: space-between; align-items: center;
@@ -216,11 +216,40 @@ pre.plain, pre:has(code:not([class*="language-"])) { border-left-color: var(--co
 .sh-com { color: var(--syn-com); font-style: italic; }
 .sh-op { color: var(--syn-punc); }
 
+/* Coloration SQL / HiveQL (TP4, générée par tp.js) */
+.sql-kw { color: var(--syn-cmd); font-weight: 600; }
+.sql-fn { color: var(--syn-var); }
+.sql-type { color: var(--syn-num); }
+.sql-str { color: var(--syn-str); }
+.sql-num { color: var(--syn-num); }
+.sql-com { color: var(--syn-com); font-style: italic; }
+.sql-op { color: var(--syn-punc); }
+
+/* Coloration YAML / INI / Dockerfile / Java (générée par tp.js) */
+.tk-kw { color: var(--syn-cmd); font-weight: 600; }
+.tk-sec { color: var(--syn-cmd); font-weight: 600; }
+.tk-key { color: var(--syn-var); }
+.tk-var { color: var(--syn-var); }
+.tk-fn { color: var(--syn-var); }
+.tk-str { color: var(--syn-str); }
+.tk-num { color: var(--syn-num); }
+.tk-type { color: var(--syn-num); }
+.tk-com { color: var(--syn-com); font-style: italic; }
+.tk-op { color: var(--syn-punc); }
+
+pre[data-lang="shell"] { border-left-color: var(--code-shell); }
+pre[data-lang="yaml"] { border-left-color: var(--code-yaml); }
+pre[data-lang="ini"] { border-left-color: var(--code-ini); }
+pre[data-lang="dockerfile"] { border-left-color: var(--code-docker); }
+pre[data-lang="java"] { border-left-color: var(--code-java); }
+pre[data-lang="xml"] { border-left-color: var(--code-xml); }
+pre[data-lang="sql"] { border-left-color: var(--code-sql); }
+
 /* Coloration manuelle (TP1/TP2) */
-pre.xml .xml-tag { color: var(--syn-cmd); }
-pre.xml .xml-attr { color: var(--syn-var); }
-pre.xml .xml-str { color: var(--syn-str); }
-pre.xml .xml-com { color: var(--syn-com); font-style: italic; }
+.xml-tag { color: var(--syn-cmd); }
+.xml-attr { color: var(--syn-var); }
+.xml-str { color: var(--syn-str); }
+.xml-com { color: var(--syn-com); font-style: italic; }
 pre.java .ij-kw { color: var(--syn-cmd); font-weight: 600; }
 pre.java .ij-cls { color: var(--syn-num); }
 pre.java .ij-met { color: var(--syn-var); }
