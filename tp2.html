@@ -20,6 +20,10 @@
       <a href="tp2.html">TP2</a>
       <a href="tp3.html">TP3</a>
       <a href="tp4.html">TP4</a>
+      <a href="tp5.html">TP5</a>
+      <a href="tp6.html">TP6</a>
+      <a href="tp7.html">TP7</a>
+      <a href="tp8.html">TP8</a>
     </nav>
   </div>
 </header>
@@ -30,7 +34,7 @@
       <p class="eyebrow">Travaux pratiques n°2 · Big Data &amp; Analyse de données</p>
       <h1>Déployer un cluster Hadoop de 4 nœuds sur VirtualBox</h1>
       <p class="lead">Passer d'une machine à un vrai cluster (1 master + 3 workers), puis calculer le chiffre d'affaires par ville avec MapReduce, en Java et en Python.</p>
-      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Hadoop 3.4.3</span><span class="chip">Java 21</span><span class="chip">Python 3</span><span class="chip">Ubuntu 24.04 LTS</span><span class="chip">Octobre 2026</span></div>
+      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Hadoop 3.5.0</span><span class="chip">Java 21</span><span class="chip">Python 3</span><span class="chip">Ubuntu Server 26.04 LTS</span><span class="chip">Octobre 2026</span></div>
     </div>
   </div>
 </header>
@@ -58,10 +62,10 @@
   <table>
     <thead><tr><th>Élément</th><th>Valeur</th></tr></thead>
     <tbody>
-      <tr><td>Framework Big Data</td><td>Apache Hadoop 3.4.3</td></tr>
+      <tr><td>Framework Big Data</td><td>Apache Hadoop 3.5.0</td></tr>
       <tr><td>Java</td><td>OpenJDK 21</td></tr>
       <tr><td>Python (MapReduce Streaming)</td><td>Python 3</td></tr>
-      <tr><td>Système d’exploitation</td><td>Ubuntu 24.04 LTS</td></tr>
+      <tr><td>Système d’exploitation</td><td>Ubuntu Server 26.04 LTS</td></tr>
       <tr><td>Virtualisation</td><td>Oracle VirtualBox</td></tr>
       <tr><td>Architecture du cluster</td><td>1 NameNode + 3 DataNodes</td></tr>
     </tbody>
@@ -137,6 +141,10 @@ flowchart TB
   <p>Les opérations de cette section doivent être exécutées sur <strong>les 4 machines virtuelles</strong>.</p>
 
   <h3>2.1 Configuration des adresses IP</h3>
+  <p>Vérifiez d'abord le nom de vos deux cartes réseau (sous VirtualBox, en général <code>enp0s3</code> pour la carte NAT et <code>enp0s8</code> pour la carte host-only) et les fichiers Netplan déjà présents :</p>
+  <pre>ip -br a
+ls /etc/netplan/</pre>
+  <p>Créez ensuite un fichier dédié au réseau du cluster :</p>
   <pre>sudo nano /etc/netplan/01-netcfg.yaml</pre>
   <pre class="yaml">network:
   version: 2
@@ -150,7 +158,15 @@ flowchart TB
         # - 192.168.56.11/24   # datanode1 → 11
         # - 192.168.56.12/24   # datanode2 → 12
         # - 192.168.56.13/24   # datanode3 → 13</pre>
-  <pre>sudo netplan apply</pre>
+  <pre>sudo chmod 600 /etc/netplan/01-netcfg.yaml
+sudo netplan apply
+ip -br a</pre>
+  <div class="box box-info">
+    <strong>Ubuntu Server 26.04 :</strong> Netplan exige que ses fichiers ne soient lisibles que par root, d'où le <code>chmod 600</code>
+    (sinon un avertissement <em>« Permissions … are too open »</em> s'affiche). Si les noms affichés par <code>ip -br a</code> diffèrent de
+    <code>enp0s3</code> / <code>enp0s8</code>, utilisez vos noms dans le fichier. Le fichier créé par l'installeur (par exemple
+    <code>50-cloud-init.yaml</code>) peut rester en place : Netplan fusionne les fichiers, et le nôtre fixe l'adresse de la carte host-only.
+  </div>
 
   <h3>2.2 Définition des hostnames</h3>
   <pre>sudo hostnamectl set-hostname master        # Sur master
@@ -167,7 +183,7 @@ sudo hostnamectl set-hostname datanode3     # Sur datanode3</pre>
 127.0.0.1       localhost</pre>
 <h2 id="3-creation-de-l-utilisateur-hadoop">3. Création de l’utilisateur Hadoop</h2>
   <div class="box box-info"><strong>Sur les 4 VM :</strong> les sections 3, 4, 5 et 8 sont à exécuter sur <strong>chaque</strong> machine (master et les trois workers). Les sections 6, 7, 9 et 10 se font sur <strong>master</strong> uniquement.</div>
-  <pre>sudo adduser --disabled-password --gecos "" hadoop
+  <pre>sudo adduser --disabled-password --comment "" hadoop
 sudo usermod -aG sudo hadoop
 sudo passwd hadoop
 su - hadoop</pre>
@@ -175,9 +191,9 @@ su - hadoop</pre>
   <pre>sudo apt update && sudo apt install openjdk-21-jdk -y
 
 cd ~
-wget https://archive.apache.org/dist/hadoop/common/hadoop-3.4.3/hadoop-3.4.3.tar.gz
-tar -xzf hadoop-3.4.3.tar.gz
-sudo mv hadoop-3.4.3 /opt/hadoop
+wget https://archive.apache.org/dist/hadoop/common/hadoop-3.5.0/hadoop-3.5.0.tar.gz
+tar -xzf hadoop-3.5.0.tar.gz
+sudo mv hadoop-3.5.0 /opt/hadoop
 sudo chown -R hadoop:hadoop /opt/hadoop</pre>
 <h2 id="5-variables-d-environnement">5. Variables d’environnement</h2>
   <pre>nano ~/.bashrc</pre>
@@ -370,10 +386,10 @@ rm -rf src/test src/main/java/sn/isi/bigdata/App.java</pre>
 
   &lt;properties&gt;
     &lt;!-- Bytecode Java 11 : s'exécute sans souci sur la JVM 21 du cluster --&gt;
-    &lt;maven.compiler.release&gt;11&lt;/maven.compiler.release&gt;
+    &lt;maven.compiler.release&gt;17&lt;/maven.compiler.release&gt;
     &lt;project.build.sourceEncoding&gt;UTF-8&lt;/project.build.sourceEncoding&gt;
     &lt;!-- Même version que le cluster installé --&gt;
-    &lt;hadoop.version&gt;3.4.3&lt;/hadoop.version&gt;
+    &lt;hadoop.version&gt;3.5.0&lt;/hadoop.version&gt;
   &lt;/properties&gt;
 
   &lt;dependencies&gt;

@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TP7 — DataFrames et Spark SQL — ISI M1 IAGE</title>
+  <meta name="description" content="TP7 du module Big Data (ISI, Master 1 IAGE) : le fil rouge du TP5 réécrit avec les DataFrames et Spark SQL, l'optimiseur Catalyst, Parquet, les jointures et les fonctions de fenêtre — et la comparaison avec les RDD.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/tp.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html"><img src="logo.jpg" alt="Logo ISI"><span>Big Data — TP<small>ISI · Master 1 IAGE · 2026-2027</small></span></a>
+    <nav class="nav" aria-label="Navigation des TP">
+      <a href="index.html">Accueil</a>
+      <a href="tp1.html">TP1</a>
+      <a href="tp2.html">TP2</a>
+      <a href="tp3.html">TP3</a>
+      <a href="tp4.html">TP4</a>
+      <a href="tp5.html">TP5</a>
+      <a href="tp6.html">TP6</a>
+      <a href="tp7.html">TP7</a>
+      <a href="tp8.html">TP8</a>
+    </nav>
+  </div>
+</header>
+<header class="doc-hero">
+  <div class="doc-hero-inner">
+    <div class="logo-tile"><img src="logo.jpg" alt="Logo ISI"></div>
+    <div>
+      <p class="eyebrow">Travaux pratiques n°7 · Big Data &amp; Analyse de données</p>
+      <h1>DataFrames et Spark SQL : refaire le TP5, et comparer</h1>
+      <p class="lead">Reprendre les analyses du TP5 avec les DataFrames et le SQL, laisser l'optimiseur choisir le plan d'exécution, puis mesurer ce que l'on gagne par rapport aux RDD : temps, volume de shuffle, lignes de code.</p>
+      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Spark 4.2.0</span><span class="chip">Spark SQL</span><span class="chip">Parquet</span><span class="chip">VM du TP1 / TP5</span><span class="chip">Octobre 2026</span></div>
+    </div>
+  </div>
+</header>
+<section class="brief" aria-label="Fiche du TP"><div class="card"><h3>Objectif</h3><p>Réécrire le fil rouge du TP5 en DataFrame et en SQL, lire les plans de Catalyst et comparer les trois écritures.</p></div><div class="card"><h3>Lien avec le cours</h3><p>Chapitre 7 — Spark SQL et DataFrames : schéma, Catalyst, plans, formats, jointures, fenêtres. Rappels du chapitre 6 (RDD, shuffle).</p></div><div class="card metier"><h3>Enjeu métier (IAGE)</h3><p>Permettre aux analystes d'écrire en SQL ce que seuls les développeurs écrivaient en RDD, sans perdre en performance.</p></div></section>
+<div class="doc-layout">
+  <nav class="toc card" aria-label="Sommaire"><h2>Sommaire</h2><ol></ol></nav>
+  <main class="doc">
+<h2 id="introduction">Introduction</h2>
+    <p>Au TP5, vous avez calculé le chiffre d'affaires par ville avec des <strong>RDD</strong> : vous disiez à Spark <em>comment</em> faire
+    (découper chaque ligne, former des paires, réduire par clé). Le chapitre 7 renverse la logique : avec un <strong>DataFrame</strong> ou une requête
+    <strong>SQL</strong>, vous décrivez <em>quoi</em> calculer, et l'optimiseur <strong>Catalyst</strong> choisit le plan d'exécution.</p>
+    <p>Ce TP reprend <strong>la même VM, les mêmes fichiers et les mêmes questions</strong> que le TP5. Chaque résultat est recalculé de trois façons
+    (RDD, DataFrame, SQL), vérifié, puis comparé. Le TP se termine par un tableau de synthèse qui constitue le cœur du livrable.</p>
+    <div class="box box-info">
+      <strong>Objectif du TP :</strong> utiliser l'API DataFrame et Spark SQL de <span class="badge badge-spark">Spark 4.2.0</span> sur YARN,
+      lire les plans produits par Catalyst, passer du texte au format <strong>Parquet</strong>, réaliser une jointure et des fonctions de fenêtre,
+      et <strong>mesurer</strong> les différences avec les RDD du TP5.
+    </div>
+    <h3>Trois écritures, un seul moteur</h3>
+    <div class="mermaid-container">
+    <pre class="mermaid">
+%%{init: {"flowchart": {"nodeSpacing": 40, "rankSpacing": 55, "padding": 18, "htmlLabels": true, "curve": "linear"}}}%%
+flowchart LR
+  RDD["RDD (TP5)<br/>map, reduceByKey<br/>lambdas Python"]
+  DF["DataFrame<br/>groupBy, agg"]
+  SQL["Spark SQL<br/>SELECT … GROUP BY"]
+  CAT["Catalyst<br/>plan logique → optimisé → physique"]
+  EX["Exécution sur YARN<br/>stages, tâches, shuffle"]
+  DF --&gt; CAT
+  SQL --&gt; CAT
+  CAT --&gt; EX
+  RDD -.-&gt;|"sans optimiseur"| EX
+    </pre>
+    </div>
+    <p class="archi-legend">
+      <strong>Légende :</strong> le DataFrame et le SQL passent par Catalyst, qui produit <strong>le même plan</strong> pour les deux.
+      Les RDD vont directement à l'exécution : Spark exécute vos lambdas telles quelles, sans pouvoir les comprendre ni les optimiser.
+    </p>
+<h2 id="1-prerequis">1. Prérequis</h2>
+    <ul>
+      <li>Le <a href="tp5.html">TP5</a> terminé : Spark 4.2.0 configuré pour YARN, et les fichiers <code>/input/purchases.txt</code> et
+        <code>/input/purchases_big.txt</code> (3 millions de ventes) présents dans HDFS.</li>
+      <li>Vos réponses et vos <strong>temps mesurés au TP5</strong> (sections 7.4 à 7.6) : vous allez les comparer.</li>
+    </ul>
+    <p>Démarrez les services et vérifiez que les données sont toujours là :</p>
+<pre>start-dfs.sh
+start-yarn.sh
+$SPARK_HOME/sbin/start-history-server.sh
+hdfs dfs -ls -h /input
+</pre>
+    <p>Si les fichiers ont disparu, refaites la section 7.1 du TP5. Ouvrez ensuite le shell sur YARN, et gardez-le ouvert jusqu'à la section 7 :</p>
+<pre>pyspark
+</pre>
+    <p>Dans le shell, deux objets existent déjà : <code>sc</code> (le <em>SparkContext</em> du TP5) et <code>spark</code> (la <em>SparkSession</em>,
+    point d'entrée des DataFrames et du SQL). Commencez par importer les fonctions dont vous aurez besoin :</p>
+<pre class="python"><span class="py-kw">from</span> pyspark.sql <span class="py-kw">import</span> functions <span class="py-kw">as</span> F
+<span class="py-kw">from</span> pyspark.sql.types <span class="py-kw">import</span> StructType, StructField, StringType, DoubleType
+<span class="py-kw">import</span> time
+
+<span class="py-kw">def</span> chrono(action):
+    t = time.time()
+    action()
+    <span class="py-kw">return</span> round(time.time() - t, 1)</pre>
+    <p><em>Comme au TP5, appuyez sur Entrée sur une ligne vide pour terminer la fonction. <code>chrono(lambda: …)</code> renvoie la durée d'une action en secondes.</em></p>
+<h2 id="2-du-texte-au-dataframe">2. Du texte au DataFrame : le schéma</h2>
+    <p>Au TP5, chaque ligne était une chaîne de caractères que vous découpiez vous-mêmes (<code>l.split("\t")</code>, puis <code>c[2]</code>,
+    <code>float(c[4])</code>). Un DataFrame, lui, connaît ses <strong>colonnes</strong> et leurs <strong>types</strong> : c'est le schéma.</p>
+    <h3>2.1 Lecture sans schéma</h3>
+<pre class="python">brut = spark.read.csv(<span class="py-str">"hdfs:///input/purchases.txt"</span>, sep=<span class="py-str">"\t"</span>)
+brut.printSchema()
+brut.show(3)</pre>
+    <p>Les colonnes s'appellent <code>_c0</code> à <code>_c5</code>, et toutes sont de type <code>string</code> : Spark ne sait rien du contenu.</p>
+    <h3>2.2 Laisser Spark deviner : inferSchema</h3>
+<pre class="python">auto = spark.read.csv(<span class="py-str">"hdfs:///input/purchases_big.txt"</span>, sep=<span class="py-str">"\t"</span>, inferSchema=<span class="py-kw">True</span>)
+auto.printSchema()</pre>
+    <h3>2.3 Imposer le schéma</h3>
+    <p>En production, on déclare le schéma : les noms de colonnes sont clairs, les types sont maîtrisés, et la lecture ne coûte rien tant qu'aucune action n'est lancée.</p>
+<pre class="python">schema = StructType([
+    StructField(<span class="py-str">"date"</span>, StringType()),
+    StructField(<span class="py-str">"heure"</span>, StringType()),
+    StructField(<span class="py-str">"ville"</span>, StringType()),
+    StructField(<span class="py-str">"categorie"</span>, StringType()),
+    StructField(<span class="py-str">"montant"</span>, DoubleType()),
+    StructField(<span class="py-str">"paiement"</span>, StringType()),
+])
+ventes = spark.read.csv(<span class="py-str">"hdfs:///input/purchases_big.txt"</span>, sep=<span class="py-str">"\t"</span>, schema=schema)
+ventes.printSchema()
+ventes.show(3)
+ventes.rdd.getNumPartitions()       <span class="py-com"># à comparer avec le TP5</span></pre>
+    <div class="box box-metier">
+      <strong>Question 1 :</strong> dans l'onglet <strong>Jobs</strong> de l'interface (port 4040, comme au TP5), combien de jobs la lecture avec
+      <code>inferSchema=True</code> a-t-elle déclenchés, alors qu'aucune action n'a été demandée ? Pourquoi ? Quels types Spark a-t-il devinés pour
+      la date et l'heure, et lequel vous semble discutable ? Le nombre de partitions de <code>ventes</code> est-il le même que celui du RDD
+      <code>big</code> du TP5 ?
+    </div>
+<h2 id="3-le-ca-par-ville-trois-ecritures">3. Le CA par ville : trois écritures</h2>
+    <h3>3.1 En DataFrame</h3>
+<pre class="python">ca_df = (ventes.groupBy(<span class="py-str">"ville"</span>)
+               .agg(F.sum(<span class="py-str">"montant"</span>).alias(<span class="py-str">"ca"</span>))
+               .orderBy(F.desc(<span class="py-str">"ca"</span>)))
+ca_df.show(5)</pre>
+    <h3>3.2 En SQL</h3>
+    <p>On donne d'abord un nom au DataFrame (une <em>vue temporaire</em>), puis on l'interroge en SQL :</p>
+<pre class="python">ventes.createOrReplaceTempView(<span class="py-str">"ventes"</span>)
+
+ca_sql = spark.sql(<span class="py-str">""</span>"
+    SELECT ville, SUM(montant) AS ca
+    FROM ventes
+    GROUP BY ville
+    ORDER BY ca DESC
+<span class="py-str">""</span>")
+ca_sql.show(5)</pre>
+    <h3>3.3 En RDD, pour comparer</h3>
+    <p>Reprenez le code du TP5 (sections 7.3 et 7.4) dans le même shell :</p>
+<pre class="python">big = sc.textFile(<span class="py-str">"hdfs:///input/purchases_big.txt"</span>)
+ca_rdd = (big.map(<span class="py-kw">lambda</span> l: l.split(<span class="py-str">"\t"</span>))
+             .map(<span class="py-kw">lambda</span> c: (c[2], float(c[4])))
+             .reduceByKey(<span class="py-kw">lambda</span> a, b: a + b))
+ca_rdd.takeOrdered(5, key=<span class="py-kw">lambda</span> t: -t[1])</pre>
+    <h3>3.4 Vérifier que les trois résultats sont identiques</h3>
+    <p>Comparer à l'œil 19 villes est fastidieux. On transforme le RDD en DataFrame, puis on cherche les lignes qui diffèrent avec
+    <code>exceptAll</code> (une différence d'ensembles) :</p>
+<pre class="python">rdd_df = spark.createDataFrame(ca_rdd, [<span class="py-str">"ville"</span>, <span class="py-str">"ca"</span>])
+arrondi = <span class="py-kw">lambda</span> df: df.select(<span class="py-str">"ville"</span>, F.round(<span class="py-str">"ca"</span>, 2).alias(<span class="py-str">"ca"</span>))
+
+arrondi(ca_df).exceptAll(arrondi(rdd_df)).count()     <span class="py-com"># 0 : aucune différence</span>
+arrondi(ca_sql).exceptAll(arrondi(ca_df)).count()     <span class="py-com"># 0</span></pre>
+    <div class="box box-info">
+      <strong>Pourquoi arrondir ?</strong> Une somme de nombres décimaux (<code>double</code>) peut différer au-delà de la dixième décimale selon l'ordre
+      dans lequel les additions sont faites, et cet ordre dépend du plan d'exécution. Pour un montant en francs CFA ou en dollars, deux décimales suffisent.
+    </div>
+    <h3>3.5 Mesurer</h3>
+    <p>Chaque mesure est faite <strong>deux fois</strong> : la première exécution comprend des coûts de démarrage (lecture du disque, chargement du code).</p>
+<pre class="python">chrono(<span class="py-kw">lambda</span>: ca_rdd.collect()), chrono(<span class="py-kw">lambda</span>: ca_rdd.collect())
+chrono(<span class="py-kw">lambda</span>: ca_df.collect()),  chrono(<span class="py-kw">lambda</span>: ca_df.collect())
+chrono(<span class="py-kw">lambda</span>: ca_sql.collect()), chrono(<span class="py-kw">lambda</span>: ca_sql.collect())</pre>
+    <p>Pour chaque écriture, relevez aussi dans l'onglet <strong>Stages</strong> le nombre de stages et le volume de <strong>Shuffle Write</strong>.</p>
+    <div class="box box-metier">
+      <strong>Question 2 :</strong> recopiez vos mesures dans un tableau (temps, nombre de stages, Shuffle Write) pour le RDD, le DataFrame et le SQL.
+      Le DataFrame et le SQL ont-ils des temps proches ? Pourquoi ? Quelle écriture est la plus rapide, et dans quel rapport ?
+      Expliquez l'écart avec le RDD en pensant à <strong>qui exécute les lambdas</strong> du TP5 (indice : PySpark lance des processus
+      <code>python3</code> à côté de chaque executor).
+    </div>
+<h2 id="4-ce-que-fait-catalyst">4. Ce que fait Catalyst</h2>
+    <h3>4.1 Lire un plan physique</h3>
+<pre class="python">ca_df.explain(<span class="py-str">"formatted"</span>)
+ca_sql.explain(<span class="py-str">"formatted"</span>)</pre>
+    <p>Un plan se lit <strong>de bas en haut</strong>. Pour le CA par ville, vous devez retrouver :</p>
+    <table>
+      <thead><tr><th>Étape du plan</th><th>Rôle</th></tr></thead>
+      <tbody>
+        <tr><td><code>Scan csv</code> — <code>ReadSchema</code></td><td>lecture du fichier ; seules les colonnes utiles sont décodées</td></tr>
+        <tr><td><code>HashAggregate</code> — <code>partial_sum</code></td><td>somme partielle, dans chaque partition, <strong>avant</strong> le shuffle</td></tr>
+        <tr><td><code>Exchange hashpartitioning(ville, 200)</code></td><td>le shuffle : regroupe les sommes partielles d'une même ville</td></tr>
+        <tr><td><code>HashAggregate</code> — <code>sum</code></td><td>somme finale par ville</td></tr>
+        <tr><td><code>Exchange rangepartitioning</code> puis <code>Sort</code></td><td>le tri du <code>ORDER BY</code> : un second shuffle</td></tr>
+      </tbody>
+    </table>
+    <p><em>Si la requête a déjà été exécutée, <code>explain</code> affiche deux plans : <strong>Final Plan</strong> (ajusté pendant l'exécution, avec des nœuds
+    <code>AQEShuffleRead</code>, voir section 4.3) et <strong>Initial Plan</strong>. Lisez l'Initial Plan.</em></p>
+    <div class="box box-metier">
+      <strong>Question 3 :</strong> les deux plans (DataFrame et SQL) sont-ils identiques ? Quelles colonnes le <code>ReadSchema</code> mentionne-t-il, et que
+      fait Spark des quatre autres ? À quelle étape du TP5 correspond le <code>partial_sum</code> : <code>reduceByKey</code> ou <code>groupByKey</code> ?
+      Faites le lien avec le <strong>combiner</strong> du chapitre 4. Pourquoi l'API DataFrame ne propose-t-elle pas d'équivalent à <code>groupByKey</code> ?
+    </div>
+    <h3>4.2 L'optimiseur réécrit votre requête</h3>
+    <p>Écrivons volontairement une requête maladroite : on agrège tout, puis on ne garde que les paiements en espèces.</p>
+<pre class="python">maladroit = (ventes.groupBy(<span class="py-str">"ville"</span>, <span class="py-str">"paiement"</span>)
+                   .agg(F.sum(<span class="py-str">"montant"</span>).alias(<span class="py-str">"ca"</span>))
+                   .filter(F.col(<span class="py-str">"paiement"</span>) == <span class="py-str">"Cash"</span>))
+maladroit.explain(<span class="py-kw">True</span>)</pre>
+    <p><code>explain(True)</code> affiche les quatre plans : analysé, logique, <strong>logique optimisé</strong> et physique.
+    Comparez la position du <code>Filter</code> dans le plan analysé et dans le plan optimisé.</p>
+    <h3>4.3 Le nombre de partitions après un shuffle</h3>
+    <p>Le plan annonce <code>hashpartitioning(ville, 200)</code> : 200 partitions pour 19 villes. Exécutez <code>ca_df.collect()</code>, puis ouvrez l'onglet
+    <strong>SQL / DataFrame</strong> de l'interface, cliquez sur la dernière requête et repérez le nœud <code>AQEShuffleRead</code>. Recommencez ensuite
+    en désactivant l'exécution adaptative :</p>
+<pre class="python">spark.conf.get(<span class="py-str">"spark.sql.shuffle.partitions"</span>)          <span class="py-com"># '200'</span>
+spark.conf.set(<span class="py-str">"spark.sql.adaptive.enabled"</span>, <span class="py-kw">False</span>)
+chrono(<span class="py-kw">lambda</span>: ca_df.collect())
+spark.conf.set(<span class="py-str">"spark.sql.adaptive.enabled"</span>, <span class="py-kw">True</span>)
+chrono(<span class="py-kw">lambda</span>: ca_df.collect())</pre>
+    <div class="box box-metier">
+      <strong>Question 4 :</strong> dans l'onglet <strong>Stages</strong>, combien de tâches compte le stage qui suit le shuffle, avec puis sans exécution adaptative (AQE) ?
+      Comparez les temps. Qu'a fait l'AQE, et pourquoi 200 partitions sont-elles un mauvais choix sur notre VM ? Au TP5, qui choisissait le nombre de
+      partitions après <code>reduceByKey</code> ?
+    </div>
+<h2 id="5-du-texte-au-format-parquet">5. Du texte au format Parquet</h2>
+    <p>Le fichier texte du TP5 est lu <strong>en entier</strong> à chaque requête, ligne par ligne. <strong>Parquet</strong> est un format en colonnes,
+    compressé et typé : Spark n'y lit que les colonnes, et parfois que les morceaux de fichier, dont il a besoin.</p>
+    <h3>5.1 Écrire en Parquet, partitionné par ville</h3>
+<pre class="python">(ventes.write
+       .mode(<span class="py-str">"overwrite"</span>)
+       .partitionBy(<span class="py-str">"ville"</span>)
+       .parquet(<span class="py-str">"hdfs:///parquet/ventes"</span>))</pre>
+    <p>Dans un second terminal, comparez la taille et l'organisation :</p>
+<pre>hdfs dfs -du -s -h /input/purchases_big.txt /parquet/ventes
+hdfs dfs -ls /parquet/ventes | head -5
+hdfs dfs -ls "/parquet/ventes/ville=Chicago"
+</pre>
+    <h3>5.2 Relire et comparer</h3>
+<pre class="python">vp = spark.read.parquet(<span class="py-str">"hdfs:///parquet/ventes"</span>)
+vp.printSchema()                    <span class="py-com"># le schéma est stocké dans le fichier</span>
+
+chicago_txt = ventes.filter(F.col(<span class="py-str">"ville"</span>) == <span class="py-str">"Chicago"</span>).agg(F.sum(<span class="py-str">"montant"</span>))
+chicago_pq = vp.filter(F.col(<span class="py-str">"ville"</span>) == <span class="py-str">"Chicago"</span>).agg(F.sum(<span class="py-str">"montant"</span>))
+chrono(<span class="py-kw">lambda</span>: chicago_txt.collect()), chrono(<span class="py-kw">lambda</span>: chicago_txt.collect())
+chrono(<span class="py-kw">lambda</span>: chicago_pq.collect()),  chrono(<span class="py-kw">lambda</span>: chicago_pq.collect())
+chicago_pq.explain()</pre>
+    <div class="box box-metier">
+      <strong>Question 5 :</strong> comparez la taille du fichier texte et du dossier Parquet, puis les temps des deux requêtes. Dans le plan de <code>chicago_pq</code>,
+      que contiennent <code>PartitionFilters</code> et <code>ReadSchema</code> ? Combien de dossiers <code>ville=…</code> Spark a-t-il réellement lus ?
+      Pour quelles requêtes ce partitionnement par ville serait-il <strong>inutile</strong> ? Pourquoi une entreprise stocke-t-elle ses données
+      d'analyse en Parquet plutôt qu'en texte ?
+    </div>
+<h2 id="6-une-jointure-avec-un-referentiel">6. Une jointure avec un référentiel</h2>
+    <p>La direction commerciale raisonne par <strong>région</strong>, une information qui n'est pas dans les tickets de caisse. On l'ajoute à partir d'un
+    petit référentiel. Dans un second terminal, sur la VM :</p>
+<pre>cd ~
+cat &gt; regions.csv &lt;&lt; 'EOF'
+ville,etat,region
+Chula Vista,CA,Ouest
+Hialeah,FL,Sud
+Indianapolis,IN,Midwest
+Norfolk,VA,Sud
+Baltimore,MD,Sud
+Santa Ana,CA,Ouest
+Gilbert,AZ,Ouest
+Memphis,TN,Sud
+Chicago,IL,Midwest
+Birmingham,AL,Sud
+Las Vegas,NV,Ouest
+Wichita,KS,Midwest
+Tucson,AZ,Ouest
+Glendale,AZ,Ouest
+Albuquerque,NM,Ouest
+Rochester,NY,Nord-Est
+Greensboro,NC,Sud
+Arlington,TX,Sud
+Corpus Christi,TX,Sud
+EOF
+hdfs dfs -mkdir -p /referentiels
+hdfs dfs -put -f regions.csv /referentiels/
+</pre>
+    <p>Ce fichier a une ligne d'en-tête, et des virgules comme séparateur. Dans le shell <code>pyspark</code> :</p>
+<pre class="python">regions = spark.read.csv(<span class="py-str">"hdfs:///referentiels/regions.csv"</span>, header=<span class="py-kw">True</span>)
+regions.show(3)
+
+ca_region = (ventes.join(regions, <span class="py-str">"ville"</span>)
+                   .groupBy(<span class="py-str">"region"</span>)
+                   .agg(F.round(F.sum(<span class="py-str">"montant"</span>), 2).alias(<span class="py-str">"ca"</span>))
+                   .orderBy(F.desc(<span class="py-str">"ca"</span>)))
+ca_region.show()
+ca_region.explain()
+chrono(<span class="py-kw">lambda</span>: ca_region.collect()), chrono(<span class="py-kw">lambda</span>: ca_region.collect())</pre>
+    <p>Cherchez dans le plan le type de jointure choisi. Puis interdisez à Spark ce choix, et recommencez :</p>
+<pre class="python">spark.conf.set(<span class="py-str">"spark.sql.autoBroadcastJoinThreshold"</span>, -1)
+ca_region.explain()
+chrono(<span class="py-kw">lambda</span>: ca_region.collect()), chrono(<span class="py-kw">lambda</span>: ca_region.collect())
+spark.conf.unset(<span class="py-str">"spark.sql.autoBroadcastJoinThreshold"</span>)</pre>
+    <div class="box box-metier">
+      <strong>Question 6 :</strong> quel algorithme de jointure Catalyst a-t-il choisi la première fois (<code>BroadcastHashJoin</code> ou <code>SortMergeJoin</code>), et lequel
+      après le réglage ? Combien d'<code>Exchange</code> compte chacun des deux plans ? Expliquez le principe du <em>broadcast</em> : qu'est-ce qui est
+      envoyé, et à qui ? Comparez les temps. Comment auriez-vous fait cette jointure en RDD au TP5 ?
+    </div>
+<h2 id="7-les-fonctions-de-fenetre">7. Les fonctions de fenêtre</h2>
+    <p>Un <code>groupBy</code> <strong>réduit</strong> : une ligne par groupe. Une fonction de fenêtre <strong>garde</strong> toutes les lignes et ajoute un
+    calcul fait sur le groupe : un rang, une part, un cumul. C'est l'outil des classements (« top N par région ») et des parts de marché.</p>
+<pre class="python"><span class="py-kw">from</span> pyspark.sql <span class="py-kw">import</span> Window
+
+ca_ville_region = (ventes.join(regions, <span class="py-str">"ville"</span>)
+                         .groupBy(<span class="py-str">"region"</span>, <span class="py-str">"ville"</span>)
+                         .agg(F.round(F.sum(<span class="py-str">"montant"</span>), 2).alias(<span class="py-str">"ca"</span>)))
+
+par_region = Window.partitionBy(<span class="py-str">"region"</span>).orderBy(F.desc(<span class="py-str">"ca"</span>))
+(ca_ville_region.withColumn(<span class="py-str">"rang"</span>, F.rank().over(par_region))
+                .filter(<span class="py-str">"rang &lt;= 2"</span>)
+                .orderBy(<span class="py-str">"region"</span>, <span class="py-str">"rang"</span>)
+                .show())</pre>
+    <p>La même requête en SQL :</p>
+<pre class="python">ca_ville_region.createOrReplaceTempView(<span class="py-str">"ca_ville_region"</span>)
+spark.sql(<span class="py-str">""</span>"
+    SELECT * FROM (
+        SELECT region, ville, ca,
+               RANK() OVER (PARTITION BY region ORDER BY ca DESC) AS rang
+        FROM ca_ville_region)
+    WHERE rang &lt;= 2
+    ORDER BY region, rang
+<span class="py-str">""</span>").show()</pre>
+    <p>Quittez le shell (<code>exit()</code>) : la suite se fait dans des scripts.</p>
+<h2 id="8-les-analyses-a-reecrire">8. Les analyses à réécrire</h2>
+    <p>Reprenez les cinq analyses de la section 7.7 du TP5, que vous avez écrites en RDD. Pour chacune, écrivez une version <strong>DataFrame</strong>
+    et une version <strong>SQL</strong>, vérifiez sur <code>purchases.txt</code> qu'elles donnent les mêmes résultats que votre version RDD, puis exécutez-les
+    sur <code>purchases_big.txt</code>.</p>
+    <ol>
+      <li>CA par catégorie de produits, trié du plus grand au plus petit.</li>
+      <li>CA par moyen de paiement, avec la part de chaque moyen dans le total (en %).</li>
+      <li>Nombre de ventes par ville, comparé au CA par ville.</li>
+      <li>Panier moyen par ville.</li>
+      <li>Top 3 des catégories pour la ville de votre choix.</li>
+    </ol>
+    <p>Puis trois analyses nouvelles, qui utilisent la jointure et les fenêtres :</p>
+    <ol start="6">
+      <li><strong>Top 3 des catégories dans chaque région.</strong></li>
+      <li><strong>Part de chaque ville dans le CA de sa région</strong> (en %).</li>
+      <li><strong>CA mensuel et CA cumulé depuis janvier</strong> (indice : le mois s'obtient à partir des 7 premiers caractères de la date).</li>
+    </ol>
+    <div class="box box-metier">
+      <strong>Question 7 :</strong> pour l'analyse 4 (panier moyen), comparez vos versions RDD, DataFrame et SQL : nombre de lignes de code, lisibilité pour
+      un analyste qui connaît le SQL, temps d'exécution. Pour l'analyse 6, expliquez pourquoi elle aurait été difficile à écrire en RDD.
+    </div>
+    <div class="box box-info">
+      Travaillez dans le shell <code>pyspark</code>, ou dans un notebook depuis PyCharm comme au TP5 (section 8) : l'environnement <code>~/venv-tp5</code>
+      et le fichier <code>spark.pth</code> fonctionnent sans changement. Fermez la session (<code>spark.stop()</code>) avant la section suivante.
+    </div>
+<h2 id="9-une-application-dataframe-avec-spark-submit">9. Une application DataFrame avec spark-submit</h2>
+    <p>Voici l'équivalent DataFrame du script <code>ca_par_ville.py</code> du TP5 (section 9). Créez <code>~/ca_par_ville_df.py</code> :</p>
+<pre>nano ~/ca_par_ville_df.py
+</pre>
+<pre class="python"><span class="py-com">#!/usr/bin/env python3</span>
+<span class="py-str">""</span><span class="py-str">"TP7 — Chiffre d'affaires par ville en DataFrame, soumis à YARN avec spark-submit."</span><span class="py-str">""</span>
+<span class="py-kw">import</span> sys
+
+<span class="py-kw">from</span> pyspark.sql <span class="py-kw">import</span> SparkSession, functions <span class="py-kw">as</span> F
+<span class="py-kw">from</span> pyspark.sql.types <span class="py-kw">import</span> StructType, StructField, StringType, DoubleType
+
+entree, sortie = sys.argv[1], sys.argv[2]
+spark = SparkSession.builder.appName(<span class="py-str">"TP7 - CA par ville (DataFrame)"</span>).getOrCreate()
+spark.sparkContext.setLogLevel(<span class="py-str">"WARN"</span>)
+
+schema = StructType([StructField(nom, DoubleType() <span class="py-kw">if</span> nom == <span class="py-str">"montant"</span> <span class="py-kw">else</span> StringType())
+                     <span class="py-kw">for</span> nom <span class="py-kw">in</span> [<span class="py-str">"date"</span>, <span class="py-str">"heure"</span>, <span class="py-str">"ville"</span>, <span class="py-str">"categorie"</span>, <span class="py-str">"montant"</span>, <span class="py-str">"paiement"</span>]])
+
+ca = (spark.read.csv(entree, sep=<span class="py-str">"\t"</span>, schema=schema)
+           .groupBy(<span class="py-str">"ville"</span>)
+           .agg(F.round(F.sum(<span class="py-str">"montant"</span>), 2).alias(<span class="py-str">"ca"</span>))
+           .orderBy(F.desc(<span class="py-str">"ca"</span>)))
+
+ca.write.mode(<span class="py-str">"overwrite"</span>).csv(sortie, header=<span class="py-kw">True</span>)
+
+print(<span class="py-str">"Top 5 des villes par chiffre d'affaires :"</span>)
+ca.show(5)
+spark.stop()</pre>
+<pre>spark-submit --deploy-mode client ~/ca_par_ville_df.py \
+    hdfs:///input/purchases_big.txt hdfs:///output-spark-ca-df
+
+hdfs dfs -ls /output-spark-ca-df
+hdfs dfs -cat /output-spark-ca-df/part-* | head -5
+</pre>
+    <p>Contrairement au TP5, le dossier de sortie peut déjà exister : <code>mode("overwrite")</code> le remplace.</p>
+    <div class="box box-metier">
+      <strong>À faire :</strong> écrivez <code>ca_par_region_df.py</code>, qui lit aussi <code>/referentiels/regions.csv</code> et produit, au format
+      <strong>Parquet</strong>, le CA par région et par mois. Soumettez-le en mode <em>cluster</em> (<code>--deploy-mode cluster --driver-memory 512m</code>,
+      comme au TP5) et vérifiez le résultat en le relisant depuis <code>pyspark</code>.
+    </div>
+<h2 id="10-synthese-rdd-dataframe-sql">10. Synthèse : RDD, DataFrame, SQL</h2>
+    <p>Rassemblez vos mesures dans ce tableau. Toutes les lignes portent sur <strong>le CA par ville de <code>purchases_big.txt</code></strong>
+    (deuxième exécution).</p>
+    <table>
+      <thead><tr><th>Écriture</th><th>Temps (s)</th><th>Stages</th><th>Shuffle Write</th><th>Lignes de code</th><th>Optimisé par Catalyst ?</th></tr></thead>
+      <tbody>
+        <tr><td>RDD, <code>reduceByKey</code> (TP5)</td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>RDD, <code>groupByKey</code> (TP5)</td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>DataFrame, sur le texte</td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>SQL, sur le texte</td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>DataFrame, sur Parquet</td><td></td><td></td><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+    <div class="box box-metier">
+      <strong>Question 8 (synthèse) :</strong> en une dizaine de lignes, dites quand vous utiliseriez encore les RDD, et quand les DataFrames ou le SQL.
+      Puis répondez à un directeur des systèmes d'information qui demande : « faut-il former nos analystes à Python, ou le SQL suffit-il pour exploiter Spark ? »
+    </div>
+<h2 id="11-resolution-des-problemes-courants-depannage">11. Résolution des problèmes courants (Dépannage)</h2>
+    <table>
+      <thead><tr><th>Symptôme</th><th>Cause probable</th><th>Solution</th></tr></thead>
+      <tbody>
+        <tr><td><em>« [UNRESOLVED_COLUMN] A column … with name `ville` cannot be resolved »</em></td><td>Fichier lu sans schéma : les colonnes s'appellent <code>_c0</code>…<code>_c5</code></td><td>Relisez avec <code>schema=schema</code> (section 2.3) ; vérifiez avec <code>printSchema()</code>.</td></tr>
+        <tr><td>Une seule colonne <code>_c0</code> contenant toute la ligne</td><td>Séparateur oublié</td><td>Ajoutez <code>sep="\t"</code> : le fichier du TP5 est séparé par des tabulations.</td></tr>
+        <tr><td>La première ligne du référentiel apparaît comme une ville nommée « ville »</td><td>En-tête lu comme une donnée</td><td><code>header=True</code> pour <code>regions.csv</code>.</td></tr>
+        <tr><td><em>« [CAST_INVALID_INPUT] »</em> ou montants à <code>null</code></td><td>Une valeur ne peut pas être convertie en nombre (Spark 4 applique le mode ANSI)</td><td>Cherchez la ligne fautive : <code>brut.filter(F.col("_c4").try_cast("double").isNull()).show()</code>.</td></tr>
+        <tr><td><code>exceptAll(…).count()</code> ne renvoie pas 0</td><td>Comparaison de nombres décimaux non arrondis</td><td>Arrondissez les deux côtés (section 3.4).</td></tr>
+        <tr><td><em>« [PATH_ALREADY_EXISTS] »</em> à l'écriture</td><td>Le dossier de sortie existe</td><td><code>.mode("overwrite")</code>, ou supprimez le dossier avec <code>hdfs dfs -rm -r</code>.</td></tr>
+        <tr><td>L'application reste en état <strong>ACCEPTED</strong></td><td>Un autre shell ou notebook occupe les conteneurs YARN</td><td>Fermez-le (<code>exit()</code>, <code>spark.stop()</code>) ou <code>yarn application -kill &lt;id&gt;</code>.</td></tr>
+        <tr><td>L'onglet <em>SQL / DataFrame</em> n'apparaît pas dans l'interface 4040</td><td>Aucune requête DataFrame ou SQL n'a encore été exécutée</td><td>Lancez une action (<code>show</code>, <code>collect</code>), puis rechargez la page.</td></tr>
+      </tbody>
+    </table>
+<h2 id="12-livrable-attendu">12. Livrable attendu</h2>
+    <p>Un court rapport (PDF ou Markdown) contenant :</p>
+    <ul>
+      <li>les réponses aux <strong>questions 1 à 8</strong>, avec une capture d'un plan physique annoté et une de l'onglet <em>SQL / DataFrame</em> ;</li>
+      <li>le code DataFrame <strong>et</strong> SQL des huit analyses de la section 8, avec leurs résultats sur <code>purchases.txt</code> ;</li>
+      <li>le script <code>ca_par_region_df.py</code> et l'identifiant de son exécution en mode cluster ;</li>
+      <li>le <strong>tableau de synthèse</strong> de la section 10, complété ;</li>
+      <li>une phrase de <strong>conclusion métier</strong> sur la part de marché des villes dans leur région (analyse 7, sur <code>purchases.txt</code>).</li>
+    </ul>
+<h2 id="annexes">Annexes</h2>
+    <h3>Annexe A — Correspondances RDD, DataFrame, SQL</h3>
+    <table>
+      <thead><tr><th>RDD (TP5)</th><th>DataFrame</th><th>SQL</th></tr></thead>
+      <tbody>
+        <tr><td><code>map(lambda l: l.split("\t"))</code></td><td><code>spark.read.csv(…, schema=…)</code></td><td>la table a déjà des colonnes</td></tr>
+        <tr><td><code>filter(…)</code></td><td><code>filter(…)</code> / <code>where(…)</code></td><td><code>WHERE</code></td></tr>
+        <tr><td><code>map(lambda c: (c[2], float(c[4])))</code></td><td><code>select("ville", "montant")</code>, <code>withColumn(…)</code></td><td>liste du <code>SELECT</code></td></tr>
+        <tr><td><code>reduceByKey(…)</code></td><td><code>groupBy(…).agg(…)</code></td><td><code>GROUP BY</code> + <code>SUM</code>, <code>COUNT</code>, <code>AVG</code></td></tr>
+        <tr><td><code>sortBy(…)</code>, <code>takeOrdered(n, …)</code></td><td><code>orderBy(…)</code>, <code>limit(n)</code></td><td><code>ORDER BY</code>, <code>LIMIT</code></td></tr>
+        <tr><td><code>join(…)</code> sur des paires (clé, valeur)</td><td><code>join(autre, "cle")</code></td><td><code>JOIN … USING (cle)</code></td></tr>
+        <tr><td>—</td><td><code>F.rank().over(Window…)</code></td><td><code>RANK() OVER (PARTITION BY … ORDER BY …)</code></td></tr>
+        <tr><td><code>cache()</code></td><td><code>cache()</code></td><td><code>CACHE TABLE</code></td></tr>
+        <tr><td><code>saveAsTextFile(…)</code></td><td><code>write.parquet(…)</code>, <code>write.csv(…)</code></td><td><code>CREATE TABLE … AS SELECT</code></td></tr>
+      </tbody>
+    </table>
+    <h3>Annexe B — Lire un plan</h3>
+    <table>
+      <thead><tr><th>Nœud</th><th>Signification</th></tr></thead>
+      <tbody>
+        <tr><td><code>Scan csv</code> / <code>FileScan parquet</code></td><td>lecture ; voir <code>ReadSchema</code>, <code>PushedFilters</code>, <code>PartitionFilters</code></td></tr>
+        <tr><td><code>Filter</code>, <code>Project</code></td><td>sélection de lignes, de colonnes</td></tr>
+        <tr><td><code>HashAggregate (partial_…)</code></td><td>agrégation partielle avant le shuffle (le combiner)</td></tr>
+        <tr><td><code>Exchange</code></td><td>shuffle : frontière de stage</td></tr>
+        <tr><td><code>BroadcastExchange</code> + <code>BroadcastHashJoin</code></td><td>la petite table est copiée vers chaque executor ; pas de shuffle de la grande</td></tr>
+        <tr><td><code>SortMergeJoin</code></td><td>les deux tables sont redistribuées par clé, puis triées</td></tr>
+        <tr><td><code>AdaptiveSparkPlan</code>, <code>AQEShuffleRead</code></td><td>plan ajusté pendant l'exécution (AQE)</td></tr>
+      </tbody>
+    </table>
+    <h3>Annexe C — Arborescence HDFS ajoutée</h3>
+<pre class="plain">/
+├── /parquet/ventes/            ← purchases_big.txt en Parquet
+│   ├── ville=Albuquerque/
+│   └── …                       (19 dossiers)
+├── /referentiels/regions.csv   ← référentiel ville → région
+├── /output-spark-ca-df/        ← résultat de ca_par_ville_df.py
+└── …                           (TP5 : /input, /spark-logs, /spark-jars)</pre>
+    <div class="box box-success">
+      <strong>Félicitations !</strong> Vous savez maintenant écrire un traitement Spark de trois façons, lire le plan que Catalyst en tire et
+      mesurer ce qu'il vous fait gagner. Au <a href="tp8.html">TP8</a>, vous referez ce travail sur une plateforme managée : Databricks.
+    </div>
+<div class="pager"><a class="prev" href="tp6.html"><small>← Précédent</small>TP6 — Spark sur le cluster du TP2</a><a class="next" href="tp8.html"><small>Suivant →</small>TP8 — Le TP7 sur Databricks</a></div>
+  </main>
+</div>
+<footer class="site-footer">ISI — Institut Supérieur d'Informatique · Master 1 — IAGE · Big Data &amp; Analyse de données · Année universitaire 2026-2027</footer>
+<script src="assets/tp.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  if (window.mermaid) {
+    mermaid.initialize({
+      startOnLoad: true, theme: 'dark', securityLevel: 'loose',
+      flowchart: { nodeSpacing: 70, rankSpacing: 100, padding: 30, htmlLabels: true, curve: 'linear' },
+      themeVariables: {
+        fontFamily: '-apple-system, Segoe UI, Roboto, Arial, sans-serif',
+        lineColor: '#f4b183', primaryColor: '#2c4f86', primaryTextColor: '#f1f5f9', primaryBorderColor: '#f4b183',
+        secondaryTextColor: '#e5e7eb', tertiaryTextColor: '#e5e7eb', textColor: '#e5e7eb',
+        mainBkg: '#2c4f86', nodeBorder: '#f4b183', clusterBkg: '#1a2f52', clusterBorder: '#3a5583',
+        titleColor: '#f4b183', edgeLabelBackground: '#13233f'
+      }
+    });
+  }
+</script>
+
+
+</body>
+</html>

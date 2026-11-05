@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TP5 — Apache Spark sur la VM du TP1 — ISI M1 IAGE</title>
+  <meta name="description" content="TP5 du module Big Data (ISI, Master 1 IAGE) : installation d'Apache Spark 4.2.0 sur le Hadoop pseudo-distribué du TP1, exécution sur YARN et premiers traitements RDD.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/tp.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html"><img src="logo.jpg" alt="Logo ISI"><span>Big Data — TP<small>ISI · Master 1 IAGE · 2026-2027</small></span></a>
+    <nav class="nav" aria-label="Navigation des TP">
+      <a href="index.html">Accueil</a>
+      <a href="tp1.html">TP1</a>
+      <a href="tp2.html">TP2</a>
+      <a href="tp3.html">TP3</a>
+      <a href="tp4.html">TP4</a>
+      <a href="tp5.html">TP5</a>
+      <a href="tp6.html">TP6</a>
+      <a href="tp7.html">TP7</a>
+      <a href="tp8.html">TP8</a>
+    </nav>
+  </div>
+</header>
+<header class="doc-hero">
+  <div class="doc-hero-inner">
+    <div class="logo-tile"><img src="logo.jpg" alt="Logo ISI"></div>
+    <div>
+      <p class="eyebrow">Travaux pratiques n°5 · Big Data &amp; Analyse de données</p>
+      <h1>Installer Apache Spark sur la VM du TP1 et calculer en mémoire</h1>
+      <p class="lead">Ajouter Spark au Hadoop pseudo-distribué du TP1 : HDFS stocke, YARN loue les ressources, Spark calcule. Puis refaire le chiffre d'affaires par ville en RDD et observer jobs, stages, shuffle et cache.</p>
+      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Spark 4.2.0</span><span class="chip">Hadoop 3.5.0 (TP1)</span><span class="chip">Java 21</span><span class="chip">Python 3</span><span class="chip">Octobre 2026</span></div>
+    </div>
+  </div>
+</header>
+<section class="brief" aria-label="Fiche du TP"><div class="card"><h3>Objectif</h3><p>Installer Spark sur la VM du TP1, l'exécuter sur YARN et lire un traitement RDD dans l'interface web (port 4040).</p></div><div class="card"><h3>Lien avec le cours</h3><p>Chapitre 6 — Spark : architecture, RDD, transformations et actions, DAG, cache, cohabitation avec Hadoop.</p></div><div class="card metier"><h3>Enjeu métier (IAGE)</h3><p>Accélérer les analyses sur le cluster déjà en place, sans nouvel investissement : même stockage, mêmes ressources, un moteur plus rapide.</p></div></section>
+<div class="doc-layout">
+  <nav class="toc card" aria-label="Sommaire"><h2>Sommaire</h2><ol></ol></nav>
+  <main class="doc">
+<h2 id="introduction">Introduction</h2>
+    <p>
+      Au TP1, vous avez installé <strong>HDFS</strong> et <strong>YARN</strong> sur une seule machine. Ce TP en est la suite directe :
+      on ajoute <strong>Apache Spark</strong> sur la <strong>même VM</strong>, avec le <strong>même utilisateur</strong> <code>hadoop</code>,
+      sans rien réinstaller. Spark ne remplace ni HDFS ni YARN : il remplace seulement le moteur de calcul MapReduce.
+    </p>
+    <ul>
+      <li><strong>HDFS</strong> continue de stocker les fichiers (les blocs de 128 Mo du chapitre 3).</li>
+      <li><strong>YARN</strong> continue de louer CPU et mémoire : il lance les <em>executors</em> Spark dans des conteneurs.</li>
+      <li><strong>Spark</strong> exécute votre code Python : le <em>driver</em> construit le DAG et envoie les tâches aux executors.</li>
+    </ul>
+    <div class="box box-info">
+      <strong>Objectif du TP :</strong> installer <strong>Apache Spark</strong> <span class="badge badge-spark">4.2.0</span> sur la VM
+      <strong>Ubuntu Server 26.04</strong> du TP1 (Hadoop <span class="badge badge-hadoop">3.5.0</span>, <span class="badge badge-java">Java 21</span>),
+      l'exécuter en mode local puis sur <strong>YARN</strong>, et retrouver dans l'interface web tout ce qui a été vu au chapitre 6.
+    </div>
+    <h3>Architecture de la VM après ce TP</h3>
+    <div class="mermaid-container">
+    <pre class="mermaid">
+%%{init: {"flowchart": {"nodeSpacing": 50, "rankSpacing": 70, "padding": 20, "htmlLabels": true, "curve": "linear"}}}%%
+flowchart LR
+  subgraph client ["Client Spark — /opt/spark"]
+    D["Driver<br/>pyspark ou spark-submit"]
+  end
+  subgraph yarn ["YARN (TP1)"]
+    RM["ResourceManager"]
+    subgraph nm ["NodeManager"]
+      AM["Conteneur<br/>ApplicationMaster"]
+      E1["Conteneur<br/>Executor 1"]
+      E2["Conteneur<br/>Executor 2"]
+    end
+  end
+  subgraph hdfs ["HDFS (TP1)"]
+    NN["NameNode"]
+    DN["DataNode<br/>blocs des fichiers"]
+  end
+  D --&gt;|"1. demande des ressources"| RM
+  RM --&gt;|"2. lance les conteneurs"| AM
+  D --&gt;|"3. envoie les tâches"| E1
+  D --&gt;|"3. envoie les tâches"| E2
+  E1 --&gt;|"4. lit les blocs"| DN
+  E2 --&gt;|"4. lit les blocs"| DN
+  D -.-&gt;|"où sont les blocs ?"| NN
+    </pre>
+    </div>
+    <p class="archi-legend">
+      <strong>Légende :</strong> tout tourne sur la même VM (<code>localhost</code>). Le <strong>driver</strong> reste sur votre session (mode <em>client</em>) ;
+      YARN lance un <strong>ApplicationMaster</strong> qui négocie les ressources, puis deux <strong>executors</strong>.
+      C'est le schéma « Spark et Hadoop cohabitent » du chapitre 6, réduit à une seule machine.
+    </p>
+<h2 id="1-prerequis">1. Prérequis</h2>
+    <h3>1.1 Ce que vous devez avoir terminé</h3>
+    <ul>
+      <li>Le <a href="tp1.html">TP1</a> complet : Hadoop 3.5.0 dans <code>/opt/hadoop</code>, Java 21, utilisateur <code>hadoop</code>, job d'exemple réussi.</li>
+      <li>Le fichier <code>purchases.txt</code> du <a href="tp2.html">TP2</a> (section 11.1) : vous le recréerez sur cette VM à la section 7.</li>
+    </ul>
+    <h3>1.2 Configuration matérielle de la VM</h3>
+    <table>
+      <thead><tr><th>Composant</th><th>Minimum</th><th>Recommandé</th></tr></thead>
+      <tbody>
+        <tr><td>Mémoire RAM de la VM</td><td>4 Go (1 executor, voir 5.2)</td><td>8 Go</td></tr>
+        <tr><td>Espace disque libre</td><td>5 Go</td><td>10 Go</td></tr>
+        <tr><td>Processeurs (vCPU)</td><td>2</td><td>4</td></tr>
+      </tbody>
+    </table>
+    <h3>1.3 Vérifier l'environnement du TP1</h3>
+    <p>Connectez-vous avec l'utilisateur <code>hadoop</code> et démarrez le cluster :</p>
+<pre>su - hadoop
+start-all.sh
+jps
+</pre>    <p>Vous devez retrouver les <strong>5 démons</strong> du TP1 : NameNode, DataNode, SecondaryNameNode, ResourceManager, NodeManager. Vérifiez ensuite Java et Python :</p>
+<pre>java -version       # openjdk version "21..."
+python3 --version   # Python 3.14 sur Ubuntu Server 26.04
+</pre>    <div class="box box-info">
+      <strong>Versions :</strong> Spark 4.2.0 embarque le <strong>client Hadoop 3.5.0</strong> : exactement la version de Hadoop installée au TP1.
+      Il fonctionne avec <strong>Java 17 ou 21</strong> (celui du TP1 convient) et demande
+      <strong>Python 3.10 ou plus récent</strong> pour PySpark. Ubuntu Server 26.04 fournit Python 3.14, officiellement pris en charge par PySpark 4.2.0 : rien à installer.
+    </div>
+<h2 id="2-telechargement-et-installation-de-spark-4-2-0">2. Téléchargement et installation de Spark 4.2.0</h2>
+    <p>On télécharge la distribution binaire <strong>pré-compilée pour Hadoop 3</strong>, comme pour Hadoop au TP1 :</p>
+<pre># Téléchargement (plusieurs centaines de Mo)
+cd ~
+wget https://archive.apache.org/dist/spark/spark-4.2.0/spark-4.2.0-bin-hadoop3.tgz
+
+# Extraction
+tar -xzf spark-4.2.0-bin-hadoop3.tgz
+
+# Déplacement vers /opt, à côté de /opt/hadoop
+sudo mv spark-4.2.0-bin-hadoop3 /opt/spark
+
+# Attribution des droits à l'utilisateur hadoop
+sudo chown -R hadoop:hadoop /opt/spark
+</pre>    <p>Vérification rapide :</p>
+<pre>ls /opt/spark
+</pre>    <p><em>Vous devez voir notamment les dossiers <code>bin</code>, <code>conf</code>, <code>examples</code>, <code>jars</code>, <code>python</code> et <code>sbin</code>.</em></p>
+    <div class="box box-warning">
+      <strong>Pas de nouveau démon :</strong> contrairement à Hadoop, on ne « démarre » pas Spark. Spark est ici un <strong>client</strong> :
+      chaque application demande ses ressources à YARN quand elle démarre, et les rend quand elle se termine.
+      N'utilisez pas les scripts <code>/opt/spark/sbin/start-all.sh</code> : ils lancent un cluster Spark <em>Standalone</em>,
+      que nous n'utilisons pas (et qui porte le même nom que le script de Hadoop).
+    </div>
+<h2 id="3-configuration-des-variables-d-environnement">3. Configuration des variables d'environnement</h2>
+    <p>Éditez à nouveau le fichier <code>.bashrc</code> de l'utilisateur hadoop :</p>
+<pre>nano ~/.bashrc
+</pre>    <p>Ajoutez ces lignes <strong>à la fin du fichier</strong>, après le bloc Hadoop du TP1 :</p>
+<pre># ---- Spark Environment Variables ----
+export SPARK_HOME=/opt/spark
+export PATH=$PATH:$SPARK_HOME/bin
+export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
+export YARN_CONF_DIR=$HADOOP_HOME/etc/hadoop
+export PYSPARK_PYTHON=python3
+export PYSPARK_DRIVER_PYTHON=python3
+</pre>    <p>Appliquez et testez :</p>
+<pre>source ~/.bashrc
+spark-submit --version
+</pre>    <p><em>Vous devez voir le logo Spark et la ligne <code>version 4.2.0</code>.</em></p>
+    <div class="box box-info">
+      <strong>Pourquoi <code>HADOOP_CONF_DIR</code> ?</strong> C'est par là que Spark trouve <code>core-site.xml</code> (adresse de HDFS :
+      <code>hdfs://localhost:8020</code>) et <code>yarn-site.xml</code> (adresse du ResourceManager). Sans cette variable,
+      <code>--master yarn</code> échoue avec le message <em>« HADOOP_CONF_DIR or YARN_CONF_DIR must be set »</em>.
+      On n'ajoute volontairement que <code>$SPARK_HOME/bin</code> au <code>PATH</code>, pas <code>$SPARK_HOME/sbin</code> : voir l'encadré de la section 2.
+    </div>
+    <h3>3.1 Une console plus lisible (recommandé)</h3>
+    <p>Par défaut, Spark affiche beaucoup de messages <code>INFO</code>. Gardez seulement les avertissements :</p>
+<pre>cd $SPARK_HOME/conf
+cp log4j2.properties.template log4j2.properties
+sed -i 's/^rootLogger.level = info/rootLogger.level = warn/' log4j2.properties
+</pre><h3>3.2 Fixer le nom d'hôte utilisé par Spark (obligatoire)</h3>
+    <p>Pour que ses composants se parlent, Spark construit des adresses du type <code>spark://…@nom-de-la-machine:port</code>,
+    à partir du nom réseau de la VM. Or ce nom est souvent invalide pour Java dans une VM : par exemple
+    <code>ubuntu-26.04--with-rosetta-.shared</code> sous Parallels (un élément du nom se termine par un tiret).
+    Spark refuse alors de démarrer avec l'erreur <em>« Invalid Spark URL: spark://HeartbeatReceiver@… »</em>.
+    Comme tout le TP se déroule sur une seule machine, on indique à Spark d'utiliser simplement <code>localhost</code> :</p>
+<pre>cd $SPARK_HOME/conf
+cp spark-env.sh.template spark-env.sh
+echo 'export SPARK_LOCAL_HOSTNAME=localhost' &gt;&gt; spark-env.sh
+tail -1 spark-env.sh
+</pre>
+    <div class="box box-info">
+      <strong>Pour comprendre :</strong> affichez le nom de votre VM avec <code>hostname</code> et <code>hostname -f</code>.
+      Un nom d'hôte valide ne contient que des lettres, des chiffres et des tirets, sans tiret au début ou à la fin de chaque partie.
+      Le fichier <code>spark-env.sh</code> est lu à chaque lancement de <code>pyspark</code> ou <code>spark-submit</code> :
+      le réglage s'applique donc aussi au mode YARN (section 5).
+    </div>
+<h2 id="4-premier-test-en-mode-local">4. Premier test en mode local</h2>
+    <p>Avant d'utiliser YARN, on vérifie Spark seul : en mode <code>local[2]</code>, driver et executor sont dans <strong>un seul processus</strong>, avec 2 cœurs.</p>
+<pre>pyspark --master "local[2]"
+</pre>    <p>Le shell PySpark s'ouvre ; la variable <code>sc</code> (le <strong>SparkContext</strong>) existe déjà. Tapez :</p>
+<pre class="python">rdd = sc.parallelize([1, 2, 3, 4, 5, 6])
+rdd.map(<span class="py-kw">lambda</span> x: x * 10).collect()          <span class="py-com"># [10, 20, 30, 40, 50, 60]</span>
+rdd.filter(<span class="py-kw">lambda</span> x: x % 2 == 0).count()     <span class="py-com"># 3</span></pre>    <p>Pendant que le shell est ouvert, ouvrez l'interface web de l'application : <a href="http://localhost:4040">http://localhost:4040</a> (depuis votre poste, préparez d'abord le tunnel décrit en 4.1).
+    Dans l'onglet <strong>Jobs</strong>, vous voyez <strong>2 jobs</strong> : un par action (<code>collect</code>, <code>count</code>).
+    Quittez le shell avec <code>exit()</code> (ou Ctrl+D).</p>
+    <div class="box box-success">
+      Si les résultats s'affichent et que l'interface 4040 montre vos deux jobs, Spark est correctement installé.
+    </div>
+    <h3>4.1 Ouvrir les interfaces web depuis votre poste</h3>
+    <p>Ubuntu Server n'a pas de navigateur : on consulte les interfaces depuis la machine hôte. Or, avec
+    <code>SPARK_LOCAL_HOSTNAME=localhost</code> (section 3.2), l'interface d'une application Spark n'écoute que <strong>dans la VM</strong> :</p>
+<pre>ss -lntp | grep 4040        # LISTEN ... 127.0.0.1:4040 : joignable seulement depuis la VM
+</pre>
+    <p>On la rend accessible depuis votre poste par un <strong>tunnel SSH</strong>. Notez d'abord l'adresse IP de la VM (<code>hostname -I</code> dans la VM),
+    puis, dans un terminal <strong>de votre poste</strong> (pas de la VM), laissez tourner :</p>
+<pre>ssh -N -L 4040:localhost:4040 -L 18080:localhost:18080 hadoop@IP_DE_LA_VM
+</pre>
+    <p>Tant que cette commande tourne, <a href="http://localhost:4040">http://localhost:4040</a> (application en cours) et
+    <a href="http://localhost:18080">http://localhost:18080</a> (historique, section 10) s'ouvrent dans le navigateur de votre poste. Arrêtez le tunnel avec Ctrl+C.</p>
+    <div class="box box-info">
+      <strong>Sur YARN (à partir de la section 6), un second chemin :</strong> le ResourceManager sert de relais vers l'interface de chaque application.
+      Ouvrez <code>http://IP_DE_LA_VM:8088</code>, cliquez sur votre application puis sur <strong>ApplicationMaster</strong>, ou tapez directement
+      <code>http://IP_DE_LA_VM:8088/proxy/application_…/</code>. Dans ce TP, toutes les adresses <code>http://localhost:…</code>
+      s'entendent depuis la VM, ou depuis votre poste avec le tunnel ci-dessus.
+    </div>
+<h2 id="5-configurer-spark-pour-yarn">5. Configurer Spark pour YARN</h2>
+    <h3>5.1 Quatre réglages côté YARN</h3>
+    <p>Éditez le <code>yarn-site.xml</code> du TP1 :</p>
+<pre>nano $HADOOP_HOME/etc/hadoop/yarn-site.xml
+</pre>    <p>Ajoutez ces quatre propriétés <strong>à l'intérieur</strong> de <code>&lt;configuration&gt;</code>, après celles du TP1 :</p>
+<pre class="xml">    &lt;property&gt;
+      &lt;name&gt;yarn.nodemanager.vmem-check-enabled&lt;/name&gt;
+      &lt;value&gt;false&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+      &lt;name&gt;yarn.log-aggregation-enable&lt;/name&gt;
+      &lt;value&gt;true&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+      &lt;name&gt;yarn.nodemanager.hostname&lt;/name&gt;
+      &lt;value&gt;localhost&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+      &lt;name&gt;yarn.nodemanager.bind-host&lt;/name&gt;
+      &lt;value&gt;0.0.0.0&lt;/value&gt;
+    &lt;/property&gt;
+</pre>    <ul>
+      <li><code>vmem-check-enabled = false</code> : YARN tue par défaut un conteneur dont la mémoire <em>virtuelle</em> dépasse 2,1 fois sa mémoire réelle. Les JVM Java 21 réservent beaucoup de mémoire virtuelle : sans ce réglage, vos executors seraient tués au démarrage (<em>« running beyond virtual memory limits »</em>). La limite de mémoire <strong>réelle</strong>, elle, reste contrôlée.</li>
+      <li><code>log-aggregation-enable = true</code> : à la fin d'une application, YARN rassemble les journaux de tous ses conteneurs dans HDFS ; la commande <code>yarn logs</code> (section 9) permet alors de les lire.</li>
+      <li><code>nodemanager.hostname = localhost</code> : YARN transmet aux executors Spark le nom du nœud où tourne leur conteneur. Par défaut, c'est le nom réseau de la VM, souvent invalide (même problème qu'en section 3.2). Les executors ne parviennent alors pas à s'enregistrer auprès du driver, et l'application reste bloquée sur <em>« Initial job has not accepted any resources »</em>. Sur une seule machine, <code>localhost</code> règle la question, comme pour le reste de la configuration du TP1.</li>
+      <li><code>nodemanager.bind-host = 0.0.0.0</code> : le NodeManager reste joignable depuis l'extérieur de la VM (journaux des conteneurs consultés depuis l'interface 8088).</li>
+    </ul>
+    <p>Redémarrez YARN pour prendre en compte les changements :</p>
+<pre>stop-yarn.sh
+start-yarn.sh
+</pre>    <h3>5.2 Le fichier spark-defaults.conf</h3>
+    <p>Ce fichier fixe les valeurs par défaut de toutes vos applications Spark :</p>
+<pre>cd $SPARK_HOME/conf
+cp spark-defaults.conf.template spark-defaults.conf
+nano spark-defaults.conf
+</pre>    <p>Ajoutez à la fin :</p>
+<pre class="plain">spark.master                     yarn
+spark.submit.deployMode          client
+spark.executor.instances         2
+spark.executor.cores             1
+spark.executor.memory            512m
+spark.yarn.am.memory             512m
+spark.eventLog.enabled           true
+spark.eventLog.dir               hdfs://localhost:8020/spark-logs
+spark.history.fs.logDirectory    hdfs://localhost:8020/spark-logs
+spark.yarn.historyServer.address localhost:18080</pre>    <div class="box box-info">
+      <strong>Le calcul de la mémoire (à comprendre) :</strong> au TP1, le NodeManager dispose de <code>4096</code> Mo
+      (<code>yarn.nodemanager.resource.memory-mb</code>). Chaque conteneur reçoit la mémoire demandée + une marge de 384 Mo,
+      arrondie au multiple de 1024 Mo supérieur (minimum d'allocation de YARN) :
+      <ul>
+        <li>executor : 512 + 384 = 896 Mo → <strong>1024 Mo</strong>, deux fois ;</li>
+        <li>ApplicationMaster : 512 + 384 = 896 Mo → <strong>1024 Mo</strong> ;</li>
+        <li>total : <strong>3072 Mo sur 4096</strong>. Le driver, lui, tourne hors de YARN, dans votre session.</li>
+      </ul>
+      <strong>VM de 4 Go</strong> (NodeManager réglé à 2048 Mo au TP1) : mettez <code>spark.executor.instances 1</code>.
+    </div>
+    <h3>5.3 Le dossier de l'historique dans HDFS</h3>
+    <p>Avec <code>spark.eventLog.enabled</code>, chaque application écrit son journal d'exécution dans HDFS. Le dossier doit exister <strong>avant</strong> la première application :</p>
+<pre>hdfs dfs -mkdir -p /spark-logs
+hdfs dfs -ls /
+</pre>    <h3>5.4 Protéger /tmp et envoyer les bibliothèques de Spark une fois pour toutes</h3>
+    <p>Sur Ubuntu Server 26.04, <code>/tmp</code> n'est <strong>pas sur le disque</strong> : c'est un espace en mémoire vive (<em>tmpfs</em>),
+    de petite taille et limité par utilisateur. Vérifiez :</p>
+<pre>df -h /tmp ~        # /tmp : « tmpfs », quelques Go au plus ; ~ : le disque de la VM
+</pre>
+    <p>Or Spark et YARN y écrivent par défaut leurs fichiers temporaires, dont une archive de toutes les bibliothèques de Spark
+    (<code>$SPARK_HOME/jars</code>, plusieurs centaines de Mo) recréée à <strong>chaque</strong> application. C'est le sens de l'avertissement
+    <em>« Neither spark.yarn.jars nor spark.yarn.archive is set »</em>. Après quelques lancements, <code>/tmp</code> est plein et Spark échoue avec
+    <em>« Disk quota exceeded »</em>, alors que le disque a encore de la place. On règle le problème en trois étapes.</p>
+
+    <h4>Étape 1 — Les fichiers temporaires de Spark sur le disque</h4>
+<pre>mkdir -p ~/tmp
+cat &gt;&gt; $SPARK_HOME/conf/spark-env.sh &lt;&lt; 'EOF'
+export SPARK_LOCAL_DIRS=/home/hadoop/tmp
+export SPARK_SUBMIT_OPTS="-Djava.io.tmpdir=/home/hadoop/tmp"
+EOF
+</pre>
+
+    <h4>Étape 2 — Les fichiers temporaires de Hadoop sur le disque</h4>
+    <p>YARN copie lui aussi les bibliothèques de chaque application dans son dossier de travail, par défaut sous <code>/tmp</code>
+    (propriété <code>hadoop.tmp.dir</code>). Si votre <code>core-site.xml</code> ne contient pas déjà <code>hadoop.tmp.dir</code>
+    (ajouté au TP1, section 6.2), arrêtez le cluster et ajoutez-la :</p>
+<pre>stop-all.sh
+mkdir -p ~/hadoop-tmp
+nano $HADOOP_HOME/etc/hadoop/core-site.xml
+</pre>
+<pre class="xml">    &lt;property&gt;
+        &lt;name&gt;hadoop.tmp.dir&lt;/name&gt;
+        &lt;value&gt;/home/hadoop/hadoop-tmp&lt;/value&gt;
+    &lt;/property&gt;
+</pre>
+<pre>start-all.sh
+jps
+</pre>
+    <p>Les données HDFS ne bougent pas : leurs dossiers (<code>/home/hadoop/hdfs</code>) sont fixés séparément depuis le TP1.</p>
+
+    <h4>Étape 3 — Déposer les bibliothèques de Spark une seule fois dans HDFS</h4>
+    <p>Procédez étape par étape et vérifiez chaque résultat avant de passer à la suivante :</p>
+<pre>cd ~
+python3 -m zipfile -c spark-libs.zip $SPARK_HOME/jars/*.jar      # quelques dizaines de secondes
+ls -lh spark-libs.zip                                              # plusieurs centaines de Mo
+
+hdfs dfs -mkdir -p /spark-jars
+hdfs dfs -put -f spark-libs.zip /spark-jars/
+hdfs dfs -ls -h /spark-jars                                        # l'archive est-elle là ?
+</pre>
+    <p>Seulement si <code>spark-libs.zip</code> apparaît dans HDFS avec la bonne taille, supprimez la copie locale et déclarez l'archive à Spark :</p>
+<pre>rm ~/spark-libs.zip
+echo "spark.yarn.archive               hdfs://localhost:8020/spark-jars/spark-libs.zip" &gt;&gt; $SPARK_HOME/conf/spark-defaults.conf
+</pre>
+    <div class="box box-warning">
+      <strong>Attention à l'ordre :</strong> si la ligne <code>spark.yarn.archive</code> est ajoutée alors que l'archive n'est pas dans HDFS,
+      plus aucune application ne démarre (<em>« File does not exist: …/spark-libs.zip »</em>).
+    </div>
+    <p>L'avertissement disparaît et les applications démarrent plus vite : YARN réutilise l'archive déjà présente dans HDFS.</p>
+    <div class="box box-warning">
+      <strong>À partir d'ici,</strong> <code>pyspark</code> et <code>spark-submit</code> utilisent YARN par défaut (<code>spark.master yarn</code>).
+      Pour revenir au mode local, ajoutez explicitement <code>--master "local[2]"</code>.
+    </div>
+<h2 id="6-valider-spark-sur-yarn">6. Valider Spark sur YARN</h2>
+    <h3>6.1 L'exemple Pi</h3>
+    <p>Spark est livré avec des exemples. Celui-ci estime π en lançant des points au hasard :</p>
+<pre>spark-submit $SPARK_HOME/examples/src/main/python/pi.py 10
+</pre>    <p>Le démarrage prend quelques dizaines de secondes (YARN doit lancer les conteneurs). Vous devez lire, vers la fin :</p>
+<pre class="plain">Pi is roughly 3.14...</pre>    <p>Ouvrez l'interface YARN <a href="http://localhost:8088">http://localhost:8088</a> : l'application <code>PythonPi</code> apparaît
+    avec le type <strong>SPARK</strong>, à côté du job MapReduce d'exemple du TP1. Les deux moteurs partagent le même gestionnaire de ressources.</p>
+    <h3>6.2 Observer l'architecture avec jps</h3>
+    <p>Ouvrez un shell PySpark sur YARN et laissez-le ouvert :</p>
+<pre>pyspark
+</pre>    <p>Dans un <strong>second terminal</strong> (toujours avec l'utilisateur hadoop), lancez <code>jps</code>. En plus des 5 démons Hadoop, trois nouveaux types de processus apparaissent :</p>
+    <table>
+      <thead><tr><th>Processus (jps)</th><th>Où il tourne</th><th>Rôle (chapitre 6)</th></tr></thead>
+      <tbody>
+        <tr><td><strong>SparkSubmit</strong></td><td>votre session</td><td>?</td></tr>
+        <tr><td><strong>ExecutorLauncher</strong></td><td>un conteneur YARN</td><td>?</td></tr>
+        <tr><td><strong>YarnCoarseGrainedExecutorBackend</strong> (× 2)</td><td>deux conteneurs YARN</td><td>?</td></tr>
+      </tbody>
+    </table>
+    <div class="box box-metier">
+      <strong>Question 1 :</strong> complétez la colonne « Rôle » à l'aide du schéma d'architecture du chapitre 6
+      (driver, ApplicationMaster, executors). Pourquoi <code>SparkSubmit</code> n'apparaît-il pas dans l'interface YARN, alors que les trois autres y sont visibles comme conteneurs ?
+    </div>
+    <p>Fermez le shell (<code>exit()</code>) puis relancez <code>jps</code> : les processus Spark ont disparu, YARN a récupéré la mémoire.</p>
+<h2 id="7-le-fil-rouge-en-rdd">7. Le fil rouge en RDD</h2>
+    <h3>7.1 Préparer les données dans HDFS</h3>
+    <p>Recréez d'abord, dans le dossier personnel de l'utilisateur hadoop, le fichier <code>purchases.txt</code> du TP2 (colonnes séparées par des tabulations : date, heure, ville, catégorie, montant, moyen de paiement) :</p>
+<pre>cd ~
+cat &gt; purchases.txt &lt;&lt; 'EOF'
+2012-12-31	17:59	Chula Vista	Music	380.67	Visa
+2012-12-31	17:59	Hialeah	Toys	115.21	MasterCard
+2012-12-31	17:59	Indianapolis	Men's Clothing	158.28	MasterCard
+2012-12-31	17:59	Norfolk	Garden	414.09	MasterCard
+2012-12-31	17:59	Baltimore	DVDs	467.3	Visa
+2012-12-31	17:59	Santa Ana	Video Games	144.73	Visa
+2012-12-31	17:59	Gilbert	Consumer Electronics	354.66	Discover
+2012-12-31	17:59	Memphis	Sporting Goods	124.79	Amex
+2012-12-31	17:59	Chicago	Men's Clothing	386.54	MasterCard
+2012-12-31	17:59	Birmingham	CDs	118.04	Cash
+2012-12-31	17:59	Las Vegas	Health and Beauty	420.46	Amex
+2012-12-31	17:59	Wichita	Toys	383.9	Cash
+2012-12-31	17:59	Tucson	Pet Supplies	268.39	MasterCard
+2012-12-31	17:59	Glendale	Women's Clothing	68.05	Amex
+2012-12-31	17:59	Albuquerque	Toys	345.7	MasterCard
+2012-12-31	17:59	Rochester	DVDs	399.57	Amex
+2012-12-31	17:59	Greensboro	Baby	277.27	Discover
+2012-12-31	17:59	Arlington	Women's Clothing	134.95	MasterCard
+2012-12-31	17:59	Corpus Christi	DVDs	441.61	Discover
+EOF
+</pre>    <p>Ce fichier de 19 lignes sert à vérifier les résultats. Pour <strong>observer</strong> le comportement de Spark (partitions, shuffle, cache),
+    il faut un volume plus réaliste. Le script suivant génère 3 millions de ventes fictives au même format (≈ 150 Mo) :</p>
+<pre>nano gen_ventes.py
+</pre><pre class="python"><span class="py-com">#!/usr/bin/env python3</span>
+<span class="py-str">"""Génère un gros fichier de ventes au format de purchases.txt (TP2)."""</span>
+<span class="py-kw">import</span> random
+<span class="py-kw">import</span> sys
+
+n = int(sys.argv[1]) <span class="py-kw">if</span> len(sys.argv) &gt; 1 <span class="py-kw">else</span> 3_000_000
+random.seed(2026)
+villes = [<span class="py-str">"Chula Vista"</span>, <span class="py-str">"Hialeah"</span>, <span class="py-str">"Indianapolis"</span>, <span class="py-str">"Norfolk"</span>, <span class="py-str">"Baltimore"</span>, <span class="py-str">"Santa Ana"</span>,
+          <span class="py-str">"Gilbert"</span>, <span class="py-str">"Memphis"</span>, <span class="py-str">"Chicago"</span>, <span class="py-str">"Birmingham"</span>, <span class="py-str">"Las Vegas"</span>, <span class="py-str">"Wichita"</span>, <span class="py-str">"Tucson"</span>,
+          <span class="py-str">"Glendale"</span>, <span class="py-str">"Albuquerque"</span>, <span class="py-str">"Rochester"</span>, <span class="py-str">"Greensboro"</span>, <span class="py-str">"Arlington"</span>, <span class="py-str">"Corpus Christi"</span>]
+categories = [<span class="py-str">"Music"</span>, <span class="py-str">"Toys"</span>, <span class="py-str">"Men's Clothing"</span>, <span class="py-str">"Garden"</span>, <span class="py-str">"DVDs"</span>, <span class="py-str">"Video Games"</span>,
+              <span class="py-str">"Consumer Electronics"</span>, <span class="py-str">"Sporting Goods"</span>, <span class="py-str">"CDs"</span>, <span class="py-str">"Health and Beauty"</span>,
+              <span class="py-str">"Pet Supplies"</span>, <span class="py-str">"Women's Clothing"</span>, <span class="py-str">"Baby"</span>, <span class="py-str">"Books"</span>, <span class="py-str">"Computers"</span>]
+paiements = [<span class="py-str">"Visa"</span>, <span class="py-str">"MasterCard"</span>, <span class="py-str">"Amex"</span>, <span class="py-str">"Discover"</span>, <span class="py-str">"Cash"</span>]
+
+<span class="py-kw">with</span> open(<span class="py-str">"purchases_big.txt"</span>, <span class="py-str">"w"</span>) <span class="py-kw">as</span> f:
+    <span class="py-kw">for</span> _ <span class="py-kw">in</span> range(n):
+        f.write(<span class="py-str">f"2012-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}\t"</span>
+                <span class="py-str">f"{random.randint(9, 20):02d}:{random.randint(0, 59):02d}\t"</span>
+                <span class="py-str">f"{random.choice(villes)}\t{random.choice(categories)}\t"</span>
+                <span class="py-str">f"{random.uniform(5, 500):.2f}\t{random.choice(paiements)}\n"</span>)
+print(n, <span class="py-str">"lignes écrites dans purchases_big.txt"</span>)</pre><pre>python3 gen_ventes.py          # environ 15 secondes
+ls -lh purchases_big.txt
+
+hdfs dfs -mkdir -p /input
+hdfs dfs -put -f purchases.txt purchases_big.txt /input/
+hdfs dfs -ls /input
+</pre>    <p>Regardez comment HDFS a découpé le gros fichier (chapitre 3) :</p>
+<pre>hdfs fsck /input/purchases_big.txt -files -blocks
+</pre>    <div class="box box-info">
+      Le fichier (≈ 150 Mo) occupe <strong>2 blocs</strong> : un de 128 Mo et un d'environ 20 Mo. Retenez ce chiffre : il va réapparaître dans Spark.
+    </div>
+    <h3>7.2 Charger et inspecter</h3>
+    <p>Ouvrez <code>pyspark</code> (sur YARN) et tapez, ligne par ligne :</p>
+<pre class="python">lignes = sc.textFile(<span class="py-str">"hdfs:///input/purchases.txt"</span>)
+lignes.take(2)
+lignes.count()                 <span class="py-com"># 19</span>
+
+big = sc.textFile(<span class="py-str">"hdfs:///input/purchases_big.txt"</span>)
+big.getNumPartitions()         <span class="py-com"># 2</span></pre>    <p>Un bloc HDFS = une partition = une tâche : la règle du chapitre 6, vérifiée.</p>
+    <h3>7.3 Des transformations sans action</h3>
+<pre class="python">champs = big.map(<span class="py-kw">lambda</span> l: l.split(<span class="py-str">"\t"</span>))
+paires = champs.map(<span class="py-kw">lambda</span> c: (c[2], float(c[4])))   <span class="py-com"># (ville, montant)</span>
+ca = paires.reduceByKey(<span class="py-kw">lambda</span> a, b: a + b)</pre>    <div class="box box-metier">
+      <strong>Question 2 :</strong> ouvrez l'onglet <strong>Jobs</strong> de <a href="http://localhost:4040">http://localhost:4040</a>.
+      Combien de jobs voyez-vous pour ces trois lignes ? Expliquez avec le vocabulaire du chapitre 6 (évaluation paresseuse).
+    </div>
+    <h3>7.4 Le chiffre d'affaires par ville : une action, un DAG</h3>
+<pre class="python">ca.takeOrdered(5, key=<span class="py-kw">lambda</span> t: -t[1])      <span class="py-com"># top 5 des villes</span>
+ca.count()                                   <span class="py-com"># nombre de villes : 19</span></pre>    <p>Dans l'interface 4040, cliquez sur le job de <code>takeOrdered</code>, puis sur <strong>DAG Visualization</strong>.</p>
+    <div class="box box-metier">
+      <strong>Question 3 :</strong> pour ce job, relevez le nombre de <strong>stages</strong> et de <strong>tâches</strong> par stage.
+      Où se trouve la frontière entre les stages, et pourquoi à cet endroit ? D'où vient le nombre de tâches du premier stage ?
+      Pour le job de <code>count()</code>, un stage est marqué <em>skipped</em> : pourquoi ?
+    </div>
+    <p>Vérifiez enfin, sur le petit fichier, que vous retrouvez <strong>les mêmes chiffres qu'au TP2</strong> (MapReduce) :</p>
+<pre class="python">petit = lignes.map(<span class="py-kw">lambda</span> l: l.split(<span class="py-str">"\t"</span>)).map(<span class="py-kw">lambda</span> c: (c[2], float(c[4])))
+sorted(petit.reduceByKey(<span class="py-kw">lambda</span> a, b: a + b).collect())</pre>    <h3>7.5 Le cache, mesuré</h3>
+    <p>On chronomètre la même action deux fois sans cache, puis trois fois avec cache :</p>
+<pre class="python"><span class="py-kw">import</span> time
+
+<span class="py-kw">def</span> chrono(rdd):
+    t = time.time()
+    n = rdd.count()
+    print(n, <span class="py-str">"lignes en"</span>, round(time.time() - t, 1), <span class="py-str">"s"</span>)
+
+chrono(paires)      <span class="py-com"># 1. sans cache</span>
+chrono(paires)      <span class="py-com"># 2. sans cache</span>
+paires.cache()
+chrono(paires)      <span class="py-com"># 3. avec cache</span>
+chrono(paires)      <span class="py-com"># 4. avec cache</span>
+chrono(paires)      <span class="py-com"># 5. avec cache</span></pre>    <p><em>Dans le shell, après le <code>def</code>, appuyez sur Entrée sur une ligne vide pour terminer la fonction.</em></p>
+    <p>Ouvrez ensuite l'onglet <strong>Storage</strong> de l'interface 4040.</p>
+    <div class="box box-metier">
+      <strong>Question 4 :</strong> recopiez vos cinq temps dans un tableau. Pourquoi le troisième n'est-il pas plus rapide que les deux premiers, alors que
+      <code>cache()</code> a déjà été appelé ? Que montre l'onglet Storage (nombre de partitions en cache, taille en mémoire) ?
+      Dans quel cas un analyste a-t-il intérêt à mettre un RDD en cache ?
+    </div>
+
+    <h3>7.6 reduceByKey contre groupByKey</h3>
+    <p>Deux façons d'obtenir le même chiffre d'affaires par ville :</p>
+<pre class="python">r1 = paires.reduceByKey(<span class="py-kw">lambda</span> a, b: a + b).collect()
+r2 = paires.groupByKey().mapValues(sum).collect()
+sorted(r1)[:3]
+sorted(r2)[:3]       <span class="py-com"># mêmes villes, mêmes montants (aux arrondis près)</span></pre>    <p>Dans l'onglet <strong>Stages</strong>, comparez la colonne <strong>Shuffle Write</strong> des deux stages correspondants.</p>
+    <div class="box box-metier">
+      <strong>Question 5 :</strong> relevez les deux volumes de shuffle. Lequel est le plus faible, et dans quel rapport ? Expliquez la différence
+      en faisant le lien avec le <strong>combiner</strong> du chapitre 4. Que se passerait-il avec un an de tickets de caisse de toute une enseigne ?
+    </div>
+    <p>Libérez la mémoire puis quittez le shell :</p>
+<pre class="python">paires.unpersist()
+exit()</pre>    <h3>7.7 Les analyses à écrire</h3>
+    <p>Comme au TP2, vous écrivez maintenant vous-mêmes les traitements, cette fois en RDD. Pour chacun, travaillez d'abord sur
+    <code>purchases.txt</code> pour vérifier le résultat, puis sur <code>purchases_big.txt</code>.</p>
+    <ol>
+      <li><strong>CA par catégorie</strong> de produits, trié du plus grand au plus petit.</li>
+      <li><strong>CA par moyen de paiement</strong>, avec la part de chaque moyen dans le total (en %).</li>
+      <li><strong>Nombre de ventes par ville</strong> : comparez avec le CA par ville (comptage contre somme).</li>
+      <li><strong>Panier moyen par ville</strong> (montant moyen d'une vente). Indice : il faut à la fois une somme et un nombre par ville.</li>
+      <li><strong>Top 3 des catégories</strong> pour la ville de votre choix.</li>
+    </ol>
+    <div class="box box-metier">
+      <strong>Lecture métier :</strong> pour deux de ces analyses, rédigez une phrase destinée à une direction commerciale
+      (ex. « le paiement par carte Visa représente X % du chiffre d'affaires »). Attention : <code>purchases_big.txt</code> est
+      <strong>généré au hasard</strong> ; seules les conclusions tirées de <code>purchases.txt</code> ont un sens métier.
+    </div>
+<h2 id="8-le-fil-rouge-dans-pycharm">8. Le fil rouge dans PyCharm : interpréteur SSH et notebook</h2>
+    <p>Le shell <code>pyspark</code> est pratique pour explorer, mais on n'y garde pas son travail. On passe maintenant à un vrai
+    environnement de développement : <strong>PyCharm</strong>, installé sur <strong>votre poste</strong>, qui exécute le code
+    <strong>dans la VM</strong> grâce à un <em>interpréteur SSH</em>.</p>
+    <h3>8.1 Le principe</h3>
+    <ul>
+      <li>PyCharm (sur votre poste) se connecte en SSH à la VM avec l'utilisateur <code>hadoop</code>.</li>
+      <li>Il envoie vos fichiers dans un dossier de la VM et y lance le Python de la VM.</li>
+      <li>Ce Python devient le <strong>driver</strong> Spark : il soumet l'application à YARN, exactement comme <code>pyspark</code>.</li>
+    </ul>
+    <p>Rien ne s'exécute sur votre poste : PyCharm n'est qu'une fenêtre sur la VM.</p>
+    <div class="box box-info">
+      <strong>Prérequis :</strong>
+      <ul>
+        <li><strong>PyCharm</strong> avec la prise en charge des interpréteurs distants (SSH). Si votre version ne propose pas l'option
+          <em>On SSH</em>, demandez la licence gratuite du <em>JetBrains Student Pack</em> avec votre adresse e-mail de l'école.</li>
+        <li>Un <strong>accès SSH à la VM depuis votre poste</strong> : <code>ssh hadoop@IP_DE_LA_VM</code> doit fonctionner
+          (<code>hostname -I</code> dans la VM donne son adresse). Sous VirtualBox avec une seule carte NAT, ajoutez une redirection de port
+          (hôte 2222 → invité 22) et utilisez le port 2222 ; avec une carte host-only, utilisez directement l'adresse IP.</li>
+      </ul>
+    </div>
+    <h3>8.2 Préparer un environnement Python dans la VM</h3>
+    <p>PyCharm a besoin d'installer quelques paquets (dont Jupyter) dans l'interpréteur qu'il utilise. Sur Ubuntu Server 26.04,
+    <code>pip</code> refuse d'installer dans le Python du système (<em>« externally-managed-environment »</em>) :
+    on crée donc un <strong>environnement virtuel</strong> réservé au TP, dans la VM, avec l'utilisateur hadoop :</p>
+<pre>sudo apt install -y python3-venv
+python3 -m venv ~/venv-tp5
+~/venv-tp5/bin/pip install jupyterlab
+~/venv-tp5/bin/python --version      # même version que python3 : 3.14
+</pre>
+    <div class="box box-warning">
+      <strong>On n'installe pas <code>pyspark</code> avec pip.</strong> PySpark est déjà fourni par <code>/opt/spark</code> ;
+      une seconde copie risquerait d'avoir une autre version que Spark. On indique plutôt à l'environnement virtuel où le trouver.
+    </div>
+    <p>Un fichier <code>.pth</code> placé dans l'environnement ajoute les dossiers de PySpark au chemin de recherche de Python,
+    à chaque démarrage : le notebook, les scripts <strong>et l'analyse du code de PyCharm</strong> trouvent alors <code>pyspark</code>.</p>
+<pre>SITE=$(~/venv-tp5/bin/python -c "import site; print(site.getsitepackages()[0])")
+printf '%s\n' /opt/spark/python /opt/spark/python/lib/py4j-0.10.9.9-src.zip &gt; $SITE/spark.pth
+~/venv-tp5/bin/python -c "import pyspark; print(pyspark.__version__)"     # 4.2.0
+</pre>
+    <p>Reste un piège : PyCharm lance Python par SSH <strong>sans lire <code>~/.bashrc</code></strong>, donc sans les variables de la section 3.
+    Spark échouerait avec <em>« HADOOP_CONF_DIR or YARN_CONF_DIR must be set »</em>. Plutôt que de les recopier dans chaque notebook et chaque
+    configuration de PyCharm, on les place dans <code>spark-env.sh</code>, que Spark lit à <strong>chaque</strong> démarrage, quel que soit le programme qui le lance :</p>
+<pre>cat &gt;&gt; /opt/spark/conf/spark-env.sh &lt;&lt; 'EOF'
+export HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop
+export YARN_CONF_DIR=/opt/hadoop/etc/hadoop
+export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
+EOF
+tail -4 /opt/spark/conf/spark-env.sh
+</pre>
+    <div class="box box-info">
+      <strong>JAVA_HOME</strong> est recalculé à chaque démarrage à partir du Java actif de la VM : Java 21 ou Java 17 (section 10 du TP1),
+      <code>amd64</code> ou <code>arm64</code>, sans chemin à écrire à la main. <code>SPARK_HOME</code> n'est pas nécessaire :
+      PySpark le retrouve à partir de son propre emplacement, <code>/opt/spark/python</code> (fichier <code>spark.pth</code>).
+    </div>
+    <h3>8.3 Configurer l'interpréteur SSH dans PyCharm</h3>
+    <ol>
+      <li>Créez un projet <strong>tp5-spark</strong> sur votre poste.</li>
+      <li>Ouvrez le sélecteur d'interpréteur (en bas à droite) puis <strong>Add New Interpreter → On SSH</strong>.</li>
+      <li>Renseignez l'hôte (<code>IP_DE_LA_VM</code>), le port (<code>22</code>, ou <code>2222</code> avec une redirection de port) et l'utilisateur
+        <code>hadoop</code>, puis le mot de passe ou votre clé SSH.</li>
+      <li>Quand PyCharm demande l'environnement, choisissez un interpréteur <strong>existant</strong> (<em>Existing</em>) :
+        <code>/home/hadoop/venv-tp5/bin/python</code>.</li>
+      <li>Dans <strong>Sync folders</strong>, remplacez le dossier proposé dans <code>/tmp</code> par <code>/home/hadoop/tp5-spark</code> :
+        vos fichiers y resteront entre deux séances.</li>
+      <li>Acceptez l'envoi automatique des fichiers (<em>Auto-upload</em>) : chaque enregistrement est copié dans la VM.</li>
+      <li>Vérifiez que <code>from pyspark.sql import SparkSession</code> n'est pas souligné en rouge dans l'éditeur. PyCharm analyse
+        l'interpréteur distant au moment où on le crée : si le fichier <code>spark.pth</code> (section 8.2) a été ajouté après, actualisez
+        cette analyse (réglages de l'interpréteur, ou <em>File → Invalidate Caches… → Invalidate and Restart</em>).</li>
+    </ol>
+    <p><em>Les libellés exacts peuvent varier selon la version de PyCharm.</em></p>
+    <h3>8.4 Le notebook du fil rouge</h3>
+    <p>Dans le projet, créez un notebook <code>tp5_fil_rouge.ipynb</code> (<em>New → Jupyter Notebook</em>) et vérifiez qu'il utilise bien
+    l'interpréteur SSH. Première cellule, pour vérifier où tourne le code :</p>
+<pre class="python"><span class="py-kw">import</span> socket, sys
+print(socket.gethostname())   <span class="py-com"># le nom de la VM, pas celui de votre poste</span>
+print(sys.executable)         <span class="py-com"># /home/hadoop/venv-tp5/bin/python</span></pre>
+    <div class="box box-info">
+      <strong>« Le notebook se connecte à localhost:54237, pas à l'IP de la VM ? »</strong> C'est normal. PyCharm démarre le serveur Jupyter
+      <strong>dans la VM</strong>, puis crée un tunnel SSH vers un port libre de votre poste (le numéro change à chaque fois). <code>localhost:54237</code>
+      est l'entrée de ce tunnel côté poste : la cellule ci-dessus prouve que le code s'exécute bien dans la VM.
+    </div>
+    <p>Grâce à <code>spark.pth</code> et <code>spark-env.sh</code> (section 8.2), la deuxième cellule se contente de créer la session Spark sur YARN :</p>
+<pre class="python"><span class="py-kw">from</span> pyspark.sql <span class="py-kw">import</span> SparkSession
+spark = SparkSession.builder.appName(<span class="py-str">"TP5 - notebook"</span>).getOrCreate()
+sc = spark.sparkContext
+print(sc.master, sc.applicationId)   <span class="py-com"># yarn application_...</span></pre>
+    <div class="box box-info">
+      <code>spark-defaults.conf</code> (YARN), <code>spark-env.sh</code> (nom d'hôte, Hadoop, Java) et <code>spark.pth</code> (PySpark)
+      sont lus automatiquement : le notebook se comporte exactement comme le shell <code>pyspark</code>.
+    </div>
+    <p>Reprenez ensuite dans le notebook, une étape par cellule, le fil rouge de la section 7 : chargement de <code>purchases_big.txt</code> (7.2),
+    chiffre d'affaires par ville (7.4) et <strong>une</strong> des analyses de la section 7.7, suivie de sa lecture métier dans une cellule de texte (Markdown).
+    L'interface de l'application s'ouvre comme en section 4.1, par le tunnel ou par le relais YARN (8088). Dernière cellule, toujours :</p>
+<pre class="python">spark.stop()     <span class="py-com"># rend les conteneurs à YARN</span></pre>
+    <div class="box box-warning">
+      <strong>Un notebook garde son application ouverte.</strong> Tant que le noyau tourne, les executors occupent leurs conteneurs YARN.
+      Avec 4096 Mo pour YARN, une seule application peut tourner à la fois : sans <code>spark.stop()</code> (ou un redémarrage du noyau),
+      le shell <code>pyspark</code> ou le <code>spark-submit</code> suivant reste bloqué en état <strong>ACCEPTED</strong>.
+    </div>
+    <h3>8.5 Un script et le débogueur : driver ou executor ?</h3>
+    <p>Créez dans le projet un fichier <code>debug_driver.py</code> :</p>
+<pre class="python"><span class="py-kw">from</span> pyspark.sql <span class="py-kw">import</span> SparkSession
+
+spark = SparkSession.builder.appName(<span class="py-str">"TP5 - débogueur"</span>).getOrCreate()
+sc = spark.sparkContext
+
+<span class="py-kw">def</span> extraire(champs):
+    <span class="py-kw">return</span> (champs[2], float(champs[4]))        <span class="py-com"># point d'arrêt B</span>
+
+lignes = sc.textFile(<span class="py-str">"hdfs:///input/purchases.txt"</span>)
+paires = lignes.map(<span class="py-kw">lambda</span> l: l.split(<span class="py-str">"\t"</span>)).map(extraire)
+ca = paires.reduceByKey(<span class="py-kw">lambda</span> a, b: a + b)     <span class="py-com"># point d'arrêt A</span>
+print(ca.takeOrdered(3, key=<span class="py-kw">lambda</span> t: -t[1]))
+spark.stop()</pre>
+    <p>Aucune variable d'environnement n'est à saisir dans la configuration d'exécution de PyCharm : <code>spark-env.sh</code> (section 8.2) s'en charge.</p>
+    <p>Lancez le script avec <strong>Run</strong> : le top 3 s'affiche dans la console de PyCharm et l'application apparaît dans YARN (8088).
+    Placez ensuite deux points d'arrêt et lancez avec <strong>Debug</strong> :</p>
+    <ul>
+      <li><strong>A</strong> sur la ligne <code>ca = paires.reduceByKey(…)</code> ;</li>
+      <li><strong>B</strong> sur la ligne <code>return …</code>, à l'intérieur de la fonction <code>extraire</code>, que Spark applique à chaque ligne du fichier.</li>
+    </ul>
+    <div class="box box-metier">
+      <strong>Question 6 :</strong> le débogueur s'arrête-t-il en A ? En B ? Au point A, inspectez la variable <code>paires</code> : contient-elle des données ?
+      Expliquez les deux comportements à l'aide de l'architecture du chapitre 6 (driver, executors, évaluation paresseuse).
+    </div>
+<h2 id="9-passer-du-shell-a-une-application">9. Passer du shell à une application</h2>
+    <p>En production, on ne tape pas les commandes dans un shell : on soumet un <strong>script</strong> avec <code>spark-submit</code>,
+    exactement comme <code>hadoop jar</code> au TP2. Créez le fichier <code>ca_par_ville.py</code> :</p>
+<pre>nano ~/ca_par_ville.py
+</pre><pre class="python"><span class="py-com">#!/usr/bin/env python3</span>
+<span class="py-str">"""TP5 — Chiffre d'affaires par ville en RDD, soumis à YARN avec spark-submit."""</span>
+<span class="py-kw">import</span> sys
+
+<span class="py-kw">from</span> pyspark <span class="py-kw">import</span> SparkConf, SparkContext
+
+entree, sortie = sys.argv[1], sys.argv[2]
+sc = SparkContext(conf=SparkConf().setAppName(<span class="py-str">"TP5 - CA par ville"</span>))
+sc.setLogLevel(<span class="py-str">"WARN"</span>)
+
+lignes = sc.textFile(entree)
+ca = (lignes.map(<span class="py-kw">lambda</span> l: l.split(<span class="py-str">"\t"</span>))
+            .filter(<span class="py-kw">lambda</span> c: len(c) == 6)
+            .map(<span class="py-kw">lambda</span> c: (c[2], float(c[4])))
+            .reduceByKey(<span class="py-kw">lambda</span> a, b: a + b))
+
+ca.map(<span class="py-kw">lambda</span> t: <span class="py-str">f"{t[0]}\t{t[1]:.2f}"</span>).saveAsTextFile(sortie)
+
+print(<span class="py-str">"Top 5 des villes par chiffre d'affaires :"</span>)
+<span class="py-kw">for</span> ville, montant <span class="py-kw">in</span> ca.takeOrdered(5, key=<span class="py-kw">lambda</span> t: -t[1]):
+    print(<span class="py-str">f"  {ville:&lt;16}{montant:&gt;14,.2f}"</span>)
+sc.stop()</pre>    <p>Le script crée lui-même son <code>SparkContext</code> (dans le shell, il existait déjà) et reçoit l'entrée et la sortie HDFS en arguments.</p>
+    <h3>9.1 Mode client</h3>
+<pre>spark-submit --deploy-mode client ~/ca_par_ville.py \
+    hdfs:///input/purchases_big.txt hdfs:///output-spark-ca
+
+hdfs dfs -ls /output-spark-ca
+hdfs dfs -cat /output-spark-ca/part-* | head -5
+</pre>    <p>Le top 5 s'affiche directement dans votre terminal, et le résultat complet est écrit dans HDFS, au même format
+    (<code>ville⇥montant</code>) que la sortie du job MapReduce du TP2.</p>
+    <h3>9.2 Mode cluster</h3>
+<pre>spark-submit --deploy-mode cluster --driver-memory 512m ~/ca_par_ville.py \
+    hdfs:///input/purchases_big.txt hdfs:///output-spark-ca-cluster
+</pre>    <p>En mode cluster, le driver devient lui-même un conteneur YARN (il remplace l'ApplicationMaster) : <code>--driver-memory 512m</code>
+    lui donne la même taille que les autres conteneurs, pour rester dans les 4096 Mo du NodeManager.</p>
+    <p>Cette fois, le top 5 n'apparaît <strong>pas</strong> dans le terminal. Notez l'identifiant de l'application affiché
+    (<code>application_…</code>) ou retrouvez-le sur <a href="http://localhost:8088">http://localhost:8088</a>, puis lisez la sortie du driver :</p>
+<pre>yarn logs -applicationId application_XXXXXXXXXXXXX_XXXX -log_files stdout
+</pre>    <div class="box box-metier">
+      <strong>Question 7 :</strong> où le driver s'exécute-t-il dans chaque mode ? Pourquoi le <code>print</code> n'apparaît-il pas dans votre terminal
+      en mode cluster ? Lequel des deux modes choisiriez-vous pour un traitement planifié chaque nuit, et pourquoi ?
+    </div>
+    <div class="box box-warning">
+      <strong>Sortie existante :</strong> comme avec MapReduce, Spark refuse d'écrire dans un dossier HDFS qui existe déjà
+      (<em>« Output directory … already exists »</em>). Supprimez-le d'abord : <code>hdfs dfs -rm -r -f /output-spark-ca</code>.
+    </div>
+<h2 id="10-l-historique-des-applications">10. L'historique des applications</h2>
+    <p>L'interface 4040 disparaît quand l'application se termine. Le <strong>serveur d'historique</strong> relit les journaux écrits dans
+    <code>/spark-logs</code> (section 5.3) et permet de revoir le DAG, les stages et le cache d'une application terminée :</p>
+<pre>$SPARK_HOME/sbin/start-history-server.sh
+jps        # un processus HistoryServer apparaît
+</pre>    <p>Ouvrez <a href="http://localhost:18080">http://localhost:18080</a> : toutes vos applications (shells PySpark, Pi, <code>ca_par_ville.py</code>)
+    y figurent. Dans l'interface YARN (8088), le lien <strong>History</strong> d'une application Spark terminée mène désormais ici.</p>
+    <h3>10.1 Arrêter proprement à la fin de la séance</h3>
+<pre>$SPARK_HOME/sbin/stop-history-server.sh
+stop-all.sh
+</pre><h2 id="11-resolution-des-problemes-courants-depannage">11. Résolution des problèmes courants (Dépannage)</h2>
+    <table>
+      <thead><tr><th>Symptôme</th><th>Cause probable</th><th>Solution</th></tr></thead>
+      <tbody>
+        <tr><td><em>« Invalid Spark URL: spark://HeartbeatReceiver@… »</em> au démarrage de <code>pyspark</code></td><td>Le nom réseau de la VM n'est pas un nom d'hôte valide pour Java</td><td>Ajoutez <code>export SPARK_LOCAL_HOSTNAME=localhost</code> dans <code>$SPARK_HOME/conf/spark-env.sh</code> (section 3.2).</td></tr>
+        <tr><td><em>« HADOOP_CONF_DIR or YARN_CONF_DIR must be set »</em></td><td>Variables de la section 3 absentes</td><td>Vérifiez <code>~/.bashrc</code> puis <code>source ~/.bashrc</code> ; <code>echo $HADOOP_CONF_DIR</code> doit afficher <code>/opt/hadoop/etc/hadoop</code>.</td></tr>
+        <tr><td>L'application reste en état <strong>ACCEPTED</strong></td><td>YARN n'a pas assez de mémoire libre pour les conteneurs demandés</td><td>Fermez les autres shells Spark ; vérifiez la mémoire disponible sur la page <em>Scheduler</em> de 8088 ; réduisez <code>spark.executor.instances</code> (section 5.2).</td></tr>
+        <tr><td>Conteneur tué : <em>« running beyond virtual memory limits »</em></td><td>Contrôle de la mémoire virtuelle actif</td><td>Ajoutez <code>yarn.nodemanager.vmem-check-enabled = false</code> (section 5.1) et redémarrez YARN.</td></tr>
+        <tr><td><em>« File does not exist: hdfs://localhost:8020/spark-logs »</em></td><td>Dossier de l'historique absent</td><td><code>hdfs dfs -mkdir -p /spark-logs</code> (section 5.3).</td></tr>
+        <tr><td><em>Connection refused</em> sur <code>localhost:8020</code> ou <code>8032</code></td><td>HDFS ou YARN n'est pas démarré</td><td><code>start-all.sh</code> puis <code>jps</code> : les 5 démons du TP1 doivent être présents.</td></tr>
+        <tr><td>Message <em>« Neither spark.yarn.jars nor spark.yarn.archive is set »</em></td><td>Spark envoie ses bibliothèques à chaque application</td><td>Sans gravité, mais à corriger : section 5.4.</td></tr>
+        <tr><td><em>« File does not exist: hdfs://localhost:8020/spark-jars/spark-libs.zip »</em></td><td>La ligne <code>spark.yarn.archive</code> a été ajoutée mais l'archive n'a pas été déposée dans HDFS (disque plein, HDFS en mode sans échec…)</td><td>Retirez la ligne : <code>sed -i '/spark.yarn.archive/d' $SPARK_HOME/conf/spark-defaults.conf</code> ; vérifiez <code>df -h /tmp ~</code> et <code>hdfs dfsadmin -safemode get</code> ; puis refaites la section 5.4 étape par étape.</td></tr>
+        <tr><td><em>« java.io.IOException: Disk quota exceeded »</em> ou <em>« No space left on device »</em>, alors que <code>df -h ~</code> montre de la place</td><td><code>/tmp</code> est en mémoire (tmpfs) sur Ubuntu 26.04 et saturé par les fichiers temporaires de Spark et de YARN</td><td>Fermez les applications Spark, puis <code>stop-yarn.sh</code> ; <code>rm -rf /tmp/spark-* /tmp/blockmgr-* /tmp/hadoop-hadoop/nm-local-dir</code> ; <code>hdfs dfs -rm -r -f /user/hadoop/.sparkStaging/*</code> ; <code>start-yarn.sh</code>. Appliquez ensuite la section 5.4 pour que cela ne se reproduise pas.</td></tr>
+        <tr><td>L'interface est sur le port <strong>4041</strong> au lieu de 4040</td><td>Une autre application Spark est déjà ouverte</td><td>Chaque application prend le port libre suivant ; fermez les shells inutiles.</td></tr>
+        <tr><td>Sur YARN, l'application reste en attente : <em>« Initial job has not accepted any resources »</em></td><td>Les executors démarrent mais ne peuvent pas joindre le driver (nom d'hôte invalide transmis par YARN)</td><td>Vérifiez <code>yarn.nodemanager.hostname = localhost</code> (section 5.1), redémarrez YARN ; pour confirmer, lisez l'erreur d'un executor : <code>yarn logs -applicationId &lt;id&gt; | grep -i -m5 exception</code>.</td></tr>
+        <tr><td>Notebook ou script : <em>« [JAVA_GATEWAY_EXITED] Java gateway process exited before sending its port number »</em></td><td>La JVM de Spark n'a pas pu démarrer : le plus souvent un <code>JAVA_HOME</code> qui n'existe pas (mauvaise version ou <code>amd64</code> au lieu de <code>arm64</code>)</td><td>Vérifiez <code>ls $JAVA_HOME/bin/java</code> ; vérifiez la ligne <code>JAVA_HOME</code> de <code>spark-env.sh</code> (section 8.2), puis <strong>redémarrez le noyau</strong> avant de relancer la cellule. Le message d'erreur détaillé de la JVM apparaît dans la console du serveur Jupyter de PyCharm, pas dans la cellule.</td></tr>
+        <tr><td>PyCharm ou le notebook : <em>« ModuleNotFoundError: No module named 'pyspark' »</em></td><td>L'environnement <code>venv-tp5</code> ne sait pas où est PySpark</td><td>Créez le fichier <code>spark.pth</code> de la section 8.2 et testez <code>~/venv-tp5/bin/python -c "import pyspark"</code>.</td></tr>
+        <tr><td>Le code s'exécute, mais <code>pyspark</code> est souligné en rouge dans PyCharm</td><td>PyCharm a analysé l'interpréteur avant l'ajout de <code>spark.pth</code></td><td>Actualisez l'interpréteur ou faites <em>File → Invalidate Caches… → Invalidate and Restart</em> (section 8.3, étape 7).</td></tr>
+        <tr><td>PyCharm ou le notebook : <em>« HADOOP_CONF_DIR or YARN_CONF_DIR must be set »</em></td><td>L'interpréteur SSH ne lit pas <code>~/.bashrc</code></td><td>Ajoutez les trois lignes <code>export</code> à <code>/opt/spark/conf/spark-env.sh</code> (section 8.2), puis relancez (redémarrez le noyau pour un notebook).</td></tr>
+        <tr><td><code>pip install</code> : <em>« externally-managed-environment »</em></td><td>Ubuntu 26.04 protège le Python du système</td><td>Installez dans l'environnement virtuel <code>~/venv-tp5</code> (section 8.2).</td></tr>
+        <tr><td>PyCharm n'arrive pas à se connecter en SSH à la VM</td><td>VM non joignable depuis le poste</td><td>Testez <code>ssh hadoop@IP_DE_LA_VM</code> dans un terminal du poste ; sous VirtualBox en NAT, ajoutez une redirection de port 2222 → 22.</td></tr>
+        <tr><td><code>yarn logs</code> ne renvoie rien</td><td>Application pas encore terminée, ou agrégation des journaux inactive</td><td>Attendez la fin de l'application ; vérifiez <code>yarn.log-aggregation-enable</code> (section 5.1) et le redémarrage de YARN.</td></tr>
+      </tbody>
+    </table>
+<h2 id="12-livrable-attendu">12. Livrable attendu</h2>
+    <p>Un court rapport (PDF ou Markdown) contenant :</p>
+    <ul>
+      <li>les <strong>commandes</strong> d'installation et de configuration (sections 2, 3 et 5) et une capture de <code>jps</code> pendant un shell PySpark sur YARN ;</li>
+      <li>les réponses aux <strong>questions 1 à 7</strong>, avec une capture du DAG du job <code>takeOrdered</code> et de l'onglet Storage ;</li>
+      <li>le code et les résultats des <strong>analyses de la section 7.7</strong> ;</li>
+      <li>le notebook <code>tp5_fil_rouge.ipynb</code> exécuté (section 8), avec sa lecture métier ;</li>
+      <li>la <strong>lecture métier</strong> de deux résultats ;</li>
+      <li>une phrase de <strong>conclusion</strong> comparant, pour le CA par ville, l'effort et le temps d'exécution entre MapReduce (TP2), Hive (TP4) et Spark (TP5).</li>
+    </ul>
+<h2 id="annexes">Annexes</h2>
+    <h3>Annexe A — Récapitulatif des ports</h3>
+    <table>
+      <thead><tr><th>Service</th><th>Port</th><th>URL / Description</th></tr></thead>
+      <tbody>
+        <tr><td>Interface d'une application Spark</td><td>4040 (puis 4041…)</td><td><code>http://localhost:4040</code> — jobs, stages, DAG, cache ; seulement pendant l'application</td></tr>
+        <tr><td>Serveur d'historique Spark</td><td>18080</td><td><code>http://localhost:18080</code> — applications terminées</td></tr>
+        <tr><td>YARN ResourceManager Web UI</td><td>8088</td><td><code>http://localhost:8088</code> — applications Spark et MapReduce</td></tr>
+        <tr><td>HDFS NameNode Web UI</td><td>9870</td><td><code>http://localhost:9870</code> — fichiers et blocs</td></tr>
+        <tr><td>HDFS NameNode IPC</td><td>8020</td><td>Adresse <code>hdfs://localhost:8020</code> utilisée par Spark</td></tr>
+      </tbody>
+    </table>
+    <h3>Annexe B — Arborescence ajoutée</h3>
+<pre class="plain">/opt/spark/
+├── bin/          ← pyspark, spark-submit, spark-shell, spark-sql
+├── sbin/         ← start-history-server.sh, stop-history-server.sh
+├── conf/         ← spark-defaults.conf, spark-env.sh, log4j2.properties
+├── jars/         ← bibliothèques Spark (dont le client Hadoop)
+├── examples/     ← exemples, dont src/main/python/pi.py
+└── python/       ← bibliothèque PySpark
+
+HDFS
+├── /input/           ← purchases.txt, purchases_big.txt
+├── /spark-logs/      ← journaux des applications (historique)
+└── /output-spark-ca/ ← résultat de ca_par_ville.py</pre>    <h3>Annexe C — Commandes Spark les plus utiles</h3>
+    <table>
+      <thead><tr><th>Commande</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>pyspark</code></td><td>Shell Python interactif, sur YARN (réglage par défaut de la section 5.2)</td></tr>
+        <tr><td><code>pyspark --master "local[2]"</code></td><td>Shell en mode local, sans YARN</td></tr>
+        <tr><td><code>spark-submit script.py arg1 arg2</code></td><td>Soumettre une application (mode client par défaut)</td></tr>
+        <tr><td><code>spark-submit --deploy-mode cluster …</code></td><td>Soumettre avec le driver dans un conteneur YARN</td></tr>
+        <tr><td><code>spark-submit --num-executors 1 --executor-memory 1g …</code></td><td>Changer les ressources pour une seule application</td></tr>
+        <tr><td><code>yarn application -list</code></td><td>Applications YARN en cours (Spark comme MapReduce)</td></tr>
+        <tr><td><code>yarn application -kill &lt;id&gt;</code></td><td>Arrêter une application bloquée</td></tr>
+        <tr><td><code>yarn logs -applicationId &lt;id&gt;</code></td><td>Journaux d'une application terminée</td></tr>
+      </tbody>
+    </table>
+    <div class="box box-success">
+      <strong>Félicitations !</strong> Votre VM fait maintenant tourner deux moteurs sur le même stockage et le même gestionnaire de ressources :
+      MapReduce et Spark. C'est l'architecture de nombreux clusters en entreprise.
+    </div>
+<div class="pager"><a class="prev" href="tp4.html"><small>← Précédent</small>TP4 — Hive et Hue</a><a class="next" href="tp6.html"><small>Suivant →</small>TP6 — Spark sur le cluster du TP2</a></div>
+  </main>
+</div>
+<footer class="site-footer">ISI — Institut Supérieur d'Informatique · Master 1 — IAGE · Big Data &amp; Analyse de données · Année universitaire 2026-2027</footer>
+<script src="assets/tp.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  if (window.mermaid) {
+    mermaid.initialize({
+      startOnLoad: true, theme: 'dark', securityLevel: 'loose',
+      flowchart: { nodeSpacing: 70, rankSpacing: 100, padding: 30, htmlLabels: true, curve: 'linear' },
+      themeVariables: {
+        fontFamily: '-apple-system, Segoe UI, Roboto, Arial, sans-serif',
+        lineColor: '#f4b183', primaryColor: '#2c4f86', primaryTextColor: '#f1f5f9', primaryBorderColor: '#f4b183',
+        secondaryTextColor: '#e5e7eb', tertiaryTextColor: '#e5e7eb', textColor: '#e5e7eb',
+        mainBkg: '#2c4f86', nodeBorder: '#f4b183', clusterBkg: '#1a2f52', clusterBorder: '#3a5583',
+        titleColor: '#f4b183', edgeLabelBackground: '#13233f'
+      }
+    });
+  }
+</script>
+
+</body>
+</html>

@@ -307,6 +307,7 @@ tbody tr:nth-child(even) { background: #f8fafd; }
 .badge-hadoop { background: #d9761f; }
 .badge-java { background: #c0392b; }
 .badge-python { background: #3776ab; }
+.badge-spark { background: #e25a1c; }
 
 /* ---------- Diagrammes Mermaid ---------- */
 .mermaid-container {

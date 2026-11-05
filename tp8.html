@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TP8 — Le TP7 sur Databricks — ISI M1 IAGE</title>
+  <meta name="description" content="TP8 du module Big Data (ISI, Master 1 IAGE) : refaire le TP7 sur Databricks Free Edition — Unity Catalog, volumes, notebooks serverless, Delta Lake, tableau de bord et job planifié — et comparer avec les TP sur machines virtuelles.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/tp.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html"><img src="logo.jpg" alt="Logo ISI"><span>Big Data — TP<small>ISI · Master 1 IAGE · 2026-2027</small></span></a>
+    <nav class="nav" aria-label="Navigation des TP">
+      <a href="index.html">Accueil</a>
+      <a href="tp1.html">TP1</a>
+      <a href="tp2.html">TP2</a>
+      <a href="tp3.html">TP3</a>
+      <a href="tp4.html">TP4</a>
+      <a href="tp5.html">TP5</a>
+      <a href="tp6.html">TP6</a>
+      <a href="tp7.html">TP7</a>
+      <a href="tp8.html">TP8</a>
+    </nav>
+  </div>
+</header>
+<header class="doc-hero">
+  <div class="doc-hero-inner">
+    <div class="logo-tile"><img src="logo.jpg" alt="Logo ISI"></div>
+    <div>
+      <p class="eyebrow">Travaux pratiques n°8 · Big Data &amp; Analyse de données</p>
+      <h1>Le TP7 sur Databricks : Spark sans installation</h1>
+      <p class="lead">Refaire le travail du TP7 sur une plateforme managée : aucun serveur à installer, des données gouvernées par Unity Catalog, des tables Delta que l'on peut corriger, un tableau de bord et un traitement planifié — puis comparer avec tout ce que vous avez construit à la main.</p>
+      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Databricks Free Edition</span><span class="chip">Serverless</span><span class="chip">Delta Lake</span><span class="chip">Navigateur web</span><span class="chip">Octobre 2026</span></div>
+    </div>
+  </div>
+</header>
+<section class="brief" aria-label="Fiche du TP"><div class="card"><h3>Objectif</h3><p>Rejouer le TP7 sur Databricks, découvrir Delta Lake, publier un tableau de bord et planifier un job.</p></div><div class="card"><h3>Lien avec le cours</h3><p>Chapitre 7 — Spark SQL et DataFrames, et sa dernière partie : Databricks, lakehouse et Delta Lake.</p></div><div class="card metier"><h3>Enjeu métier (IAGE)</h3><p>Choisir entre construire sa plateforme Big Data et l'acheter en service : coûts, compétences, contrôle, souveraineté des données.</p></div></section>
+<div class="doc-layout">
+  <nav class="toc card" aria-label="Sommaire"><h2>Sommaire</h2><ol></ol></nav>
+  <main class="doc">
+<h2 id="introduction">Introduction</h2>
+    <p>Du TP1 au TP7, vous avez <strong>construit</strong> votre plateforme : installer Java, Hadoop et Spark, régler la mémoire de YARN, protéger
+    <code>/tmp</code>, ouvrir des tunnels SSH. Databricks propose l'inverse : la plateforme est déjà là, dans le navigateur, et le calcul démarre en
+    quelques secondes. Ce TP refait le travail du TP7 sur <strong>Databricks Free Edition</strong>, l'offre gratuite destinée à l'apprentissage.</p>
+    <div class="box box-info">
+      <strong>Objectif du TP :</strong> créer un espace Databricks, y ranger les données dans <strong>Unity Catalog</strong>, rejouer le TP7 dans un
+      <strong>notebook serverless</strong>, découvrir ce que la plateforme interdit et ce qu'elle ajoute (<strong>Delta Lake</strong>, tableau de bord,
+      job planifié), puis comparer les quatre derniers TP.
+    </div>
+    <h3>Ce qui remplace quoi</h3>
+    <div class="mermaid-container">
+    <pre class="mermaid">
+%%{init: {"flowchart": {"nodeSpacing": 35, "rankSpacing": 60, "padding": 18, "htmlLabels": true, "curve": "linear"}}}%%
+flowchart LR
+  subgraph poste ["Votre poste"]
+    NAV["Navigateur web"]
+  end
+  subgraph dbx ["Espace Databricks Free Edition"]
+    direction TB
+    NBK["Notebook<br/>Python + SQL"]
+    SQLW["SQL Editor<br/>Tableau de bord"]
+    JOB["Job planifié"]
+    subgraph calc ["Calcul géré (serverless)"]
+      SRV["Spark serverless<br/>(notebooks, jobs)"]
+      WH["SQL warehouse<br/>2X-Small"]
+    end
+    subgraph uc ["Unity Catalog : workspace.tp8"]
+      VOL["Volume donnees<br/>purchases.txt, regions.csv, purchases_big/"]
+      TAB["Tables Delta<br/>ventes, regions, ca_region_mois"]
+    end
+  end
+  NAV --&gt; NBK
+  NAV --&gt; SQLW
+  NBK --&gt; SRV
+  JOB --&gt; SRV
+  SQLW --&gt; WH
+  SRV --&gt; VOL
+  SRV --&gt; TAB
+  WH --&gt; TAB
+    </pre>
+    </div>
+    <p class="archi-legend">
+      <strong>Légende :</strong> le volume et les tables jouent le rôle de HDFS et du metastore Hive ; le calcul serverless remplace YARN et les executors ;
+      le job remplace <code>spark-submit</code> lancé à la main ; le tableau de bord remplace Hue (TP4). Vous ne voyez plus aucune machine.
+    </p>
+    <table>
+      <thead><tr><th>TP1 à TP7 (sur VM)</th><th>TP8 (Databricks)</th></tr></thead>
+      <tbody>
+        <tr><td>HDFS (<code>hdfs:///input/…</code>)</td><td>Volume Unity Catalog (<code>/Volumes/workspace/tp8/donnees/…</code>)</td></tr>
+        <tr><td>Tables Hive, fichiers Parquet</td><td>Tables <strong>Delta</strong> dans Unity Catalog</td></tr>
+        <tr><td>YARN, executors, <code>spark-defaults.conf</code></td><td>Calcul <strong>serverless</strong> : aucun réglage de mémoire</td></tr>
+        <tr><td><code>pyspark</code>, PyCharm, Jupyter</td><td>Notebook Databricks (Python et <code>%sql</code>)</td></tr>
+        <tr><td>Interface Spark (4040), historique (18080)</td><td><strong>Profil de requête</strong> (<em>Query profile</em>)</td></tr>
+        <tr><td><code>spark-submit</code> + planification à la main</td><td><strong>Job</strong> planifié</td></tr>
+        <tr><td>Hue (TP4)</td><td>SQL Editor et tableau de bord</td></tr>
+      </tbody>
+    </table>
+<h2 id="1-prerequis">1. Prérequis</h2>
+    <ul>
+      <li>Le <a href="tp7.html">TP7</a> terminé : vous réutiliserez votre code DataFrame et SQL, et vos mesures.</li>
+      <li>Un navigateur récent et une adresse e-mail (de préférence celle de l'école). Aucune carte bancaire n'est demandée.</li>
+      <li>Le fichier <code>regions.csv</code> du TP7 (section 6) <strong>sur votre poste</strong>. Récupérez-le depuis la VM, dans un terminal de votre poste :
+        <code>scp hadoop@IP_DE_LA_VM:~/regions.csv .</code> — ou recréez-le avec un éditeur de texte.</li>
+      <li>Le notebook du TP : <a href="notebooks/tp8_etudiant.ipynb" download><strong>tp8_etudiant.ipynb</strong></a> (clic droit → <em>Enregistrer le lien sous…</em> si le navigateur l'affiche au lieu de le télécharger).</li>
+    </ul>
+    <div class="box box-warning">
+      <strong>Free Edition : des limites à connaître.</strong> Uniquement du calcul serverless, un seul SQL warehouse de taille 2X-Small, au plus 5 tâches de job
+      simultanées, et un <strong>quota quotidien</strong> : s'il est dépassé, le calcul est coupé jusqu'au lendemain (les données sont conservées).
+      L'offre est réservée à un usage non commercial. Travaillez sobrement : pas de boucle de mesures inutiles, et mettez en pause le job à la fin.
+    </div>
+    <p><em>L'interface de Databricks évolue souvent : si un libellé diffère légèrement de ce qui est écrit ici, cherchez l'élément équivalent au même endroit.</em></p>
+<h2 id="2-creer-son-espace-databricks">2. Créer son espace Databricks</h2>
+    <h3>2.1 Inscription</h3>
+    <ol>
+      <li>Ouvrez la page d'inscription de Databricks Free Edition :
+        <a href="https://login.databricks.com/?intent=CE_SIGN_UP">https://login.databricks.com/?intent=CE_SIGN_UP</a>.</li>
+      <li>Choisissez une méthode : compte <strong>Google</strong>, compte <strong>Microsoft</strong>, ou <strong>adresse e-mail</strong> (un code à usage unique
+        vous est alors envoyé).</li>
+      <li>Databricks crée votre espace de travail (<em>workspace</em>). Patientez jusqu'à l'affichage de la page d'accueil.</li>
+    </ol>
+    <h3>2.2 Le tour de l'espace</h3>
+    <p>La barre latérale gauche regroupe les outils. Repérez ceux dont vous aurez besoin :</p>
+    <table>
+      <thead><tr><th>Entrée de la barre latérale</th><th>Usage dans ce TP</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Workspace</strong></td><td>vos dossiers et notebooks (section 4)</td></tr>
+        <tr><td><strong>Catalog</strong></td><td>l'explorateur Unity Catalog : catalogues, schémas, volumes, tables (sections 3 et 6)</td></tr>
+        <tr><td><strong>SQL Editor</strong></td><td>écrire et exécuter des requêtes SQL sur le SQL warehouse (section 7)</td></tr>
+        <tr><td><strong>Dashboards</strong></td><td>les tableaux de bord (section 7)</td></tr>
+        <tr><td><strong>Jobs &amp; Pipelines</strong></td><td>les traitements planifiés (section 8)</td></tr>
+        <tr><td><strong>SQL Warehouses</strong> (ou <em>Compute</em>)</td><td>le calcul réservé au SQL</td></tr>
+      </tbody>
+    </table>
+    <p>Cliquez sur <strong>Catalog</strong> : un catalogue nommé <code>workspace</code> doit apparaître, avec un schéma <code>default</code>.
+    C'est ce catalogue que le TP utilise. S'il porte un autre nom dans votre espace, notez-le : vous l'indiquerez dans le notebook.</p>
+    <div class="box box-info">
+      <strong>Unity Catalog en une phrase :</strong> tout objet de données a un nom en trois parties, <code>catalogue.schéma.objet</code>
+      (par exemple <code>workspace.tp8.ventes</code>), et des droits d'accès gérés au même endroit. C'est le rôle que jouait le metastore de Hive au TP4,
+      étendu aux fichiers.
+    </div>
+<h2 id="3-le-notebook-et-le-stockage">3. Le notebook et le stockage</h2>
+    <h3>3.1 Importer le notebook</h3>
+    <ol>
+      <li>Cliquez sur <strong>Workspace</strong>, puis sur <strong>Home</strong> (votre dossier personnel).</li>
+      <li>En haut à droite, ouvrez le menu <strong>⋮</strong> (ou faites un clic droit dans le dossier) et choisissez <strong>Import</strong>.</li>
+      <li>Choisissez <strong>File</strong>, glissez <code>tp8_etudiant.ipynb</code> dans la zone prévue, puis cliquez sur <strong>Import</strong>.</li>
+      <li>Ouvrez le notebook. En haut à droite, cliquez sur <strong>Connect</strong> et choisissez <strong>Serverless</strong>.</li>
+    </ol>
+    <p>Une cellule s'exécute avec <strong>Maj + Entrée</strong> ou le bouton ▶ à sa gauche. Le premier démarrage du calcul peut prendre quelques secondes.
+    Dans un notebook Databricks, <code>spark</code> existe déjà, et une cellule qui commence par <code>%sql</code> est exécutée en SQL.</p>
+    <h3>3.2 Créer le schéma et le volume</h3>
+    <p>Exécutez les cellules des parties 1 et 2 du notebook. La première fixe les noms (<code>CATALOGUE = "workspace"</code> : modifiez-le si besoin) ;
+    la deuxième crée le schéma <code>tp8</code> et le volume <code>donnees</code> :</p>
+<pre class="python">spark.sql(<span class="py-str">f"CREATE SCHEMA IF NOT EXISTS {CATALOGUE}.{SCHEMA}"</span>)
+spark.sql(<span class="py-str">f"CREATE VOLUME IF NOT EXISTS {CATALOGUE}.{SCHEMA}.{VOLUME}"</span>)</pre>
+    <p>Vérifiez dans <strong>Catalog</strong> : <code>workspace</code> → <code>tp8</code> → <em>Volumes</em> → <code>donnees</code>.
+    <em>Sans code, le même résultat s'obtient en sélectionnant le schéma puis <strong>Create → Volume</strong>.</em></p>
+    <p>La cellule suivante écrit <code>purchases.txt</code> (les 19 ventes des TP2, TP5 et TP7) dans le volume, avec un simple <code>open()</code> Python :
+    un volume se manipule comme un dossier.</p>
+    <h3>3.3 Téléverser le référentiel des régions</h3>
+    <ol>
+      <li>Dans la barre latérale, cliquez sur <strong>New</strong> → <strong>Add or upload data</strong>.</li>
+      <li>Choisissez <strong>Upload files to a volume</strong>.</li>
+      <li>Sélectionnez la destination <code>workspace</code> → <code>tp8</code> → <code>donnees</code>.</li>
+      <li>Glissez <code>regions.csv</code> depuis votre poste, puis cliquez sur <strong>Upload</strong>.</li>
+    </ol>
+    <p>Revenez au notebook et exécutez la cellule <code>display(dbutils.fs.ls(BASE))</code> : <code>purchases.txt</code> et <code>regions.csv</code>
+    doivent apparaître.</p>
+    <h3>3.4 Générer 3 millions de ventes avec Spark</h3>
+    <p>Pas de VM, donc pas de <code>python3 gen_ventes.py</code>. La partie 3 du notebook produit le même genre de données <strong>avec Spark</strong> :
+    <code>spark.range</code> crée 3 millions de lignes numérotées, puis chaque colonne est tirée au hasard. Les montants ne seront donc
+    <strong>pas</strong> ceux du TP7 : comparez les démarches, les plans et les temps, pas les chiffres.</p>
+<pre class="python">gen = (spark.range(1, 3_000_001).withColumnRenamed(<span class="py-str">"id"</span>, <span class="py-str">"id_vente"</span>)
+       .select(<span class="py-str">"id_vente"</span>,
+               F.format_string(<span class="py-str">"2012-%02d-%02d"</span>, entier(1, 12, 1), entier(1, 28, 2)).alias(<span class="py-str">"date"</span>),
+               <span class="py-com"># … heure, ville, catégorie, montant, paiement</span>
+       ))
+gen.drop(<span class="py-str">"id_vente"</span>).write.mode(<span class="py-str">"overwrite"</span>).csv(<span class="py-str">f"{BASE}/purchases_big"</span>, sep=<span class="py-str">"\t"</span>)</pre>
+    <div class="box box-metier">
+      <strong>Question 1 :</strong> dans <strong>Catalog</strong>, ouvrez le volume <code>donnees</code> : sous quelle forme se présente <code>purchases_big</code> (un fichier
+      ou un dossier) ? Pourquoi ? Où les données sont-elles physiquement stockées, et qui s'occupe de leur réplication, que vous régliez au TP2 avec
+      <code>dfs.replication</code> ? Pourquoi générer les données avec Spark plutôt qu'avec une boucle Python dans le notebook ?
+    </div>
+<h2 id="4-rejouer-le-tp7">4. Rejouer le TP7</h2>
+    <h3>4.1 Lire et calculer</h3>
+    <p>La partie 4 du notebook relit les données avec le schéma du TP7, puis calcule le CA par ville en DataFrame et en SQL. Seuls les chemins changent :</p>
+<pre class="python">ventes = spark.read.csv(<span class="py-str">f"{BASE}/purchases_big"</span>, sep=<span class="py-str">"\t"</span>, schema=schema)   <span class="py-com"># TP7 : hdfs:///input/purchases_big.txt</span>
+ventes.createOrReplaceTempView(<span class="py-str">"ventes"</span>)</pre>
+<pre class="python">%sql
+<span class="py-kw">SELECT</span> ville, <span class="py-kw">ROUND</span>(<span class="py-kw">SUM</span>(montant), 2) <span class="py-kw">AS</span> ca
+<span class="py-kw">FROM</span> ventes
+<span class="py-kw">GROUP</span> <span class="py-kw">BY</span> ville
+<span class="py-kw">ORDER</span> <span class="py-kw">BY</span> ca <span class="py-kw">DESC</span></pre>
+    <p>Le résultat d'une cellule <code>%sql</code> ou de <code>display(…)</code> est un tableau interactif : cliquez sur <strong>+</strong> au-dessus du tableau
+    pour en tirer un graphique (barres, par exemple), sans écrire de code.</p>
+    <h3>4.2 Jointure, fenêtres et analyses</h3>
+    <p>Complétez les cellules <code># À FAIRE</code> de la partie 4 avec <strong>votre</strong> code du TP7 : CA par région (jointure avec <code>regions.csv</code>),
+    les deux meilleures villes de chaque région (fenêtre), puis les analyses 2, 4, 6, 7 et 8 de la section 8 du TP7. Vérifiez chaque analyse sur la vue
+    <code>petit</code> (les 19 ventes) : vous devez retrouver les résultats du TP7.</p>
+    <h3>4.3 Le profil de requête</h3>
+    <p>L'interface Spark (port 4040) n'existe pas ici. Pour voir ce qu'a fait le moteur :</p>
+    <ol>
+      <li>sous la cellule qui a exécuté la requête, cliquez sur <strong>See performance</strong> (ou sur l'indicateur d'exécution de la cellule) ;</li>
+      <li>choisissez la requête, puis <strong>See query profile</strong>.</li>
+    </ol>
+    <p>Le profil affiche un graphe d'opérateurs (lecture, agrégation, échange, tri…) avec, pour chacun, le nombre de lignes et le temps passé.</p>
+    <div class="box box-metier">
+      <strong>Question 2 :</strong> comparez le plan (<code>ca_df.explain("formatted")</code>) et le profil de requête avec ce que vous aviez observé au TP7 : retrouvez-vous l'agrégation
+      partielle et l'<code>Exchange</code> ? Quels noms d'opérateurs sont nouveaux ? Comparez les temps du CA par ville avec ceux du TP7.
+      Qu'est-ce que l'interface Spark du TP5 vous montrait et que le profil de requête ne montre plus (pensez aux executors et aux machines) ?
+    </div>
+<h2 id="5-ce-que-la-plateforme-interdit">5. Ce que la plateforme interdit</h2>
+    <p>La partie 5 du notebook contient trois cellules marquées <code># ERREUR ATTENDUE</code>, qui fonctionnaient sur votre VM :</p>
+<pre class="python">sc = spark.sparkContext                                     <span class="py-com"># l'API RDD du TP5</span>
+ventes.cache()                                              <span class="py-com"># le cache du TP5 (section 7.5)</span>
+spark.conf.set(<span class="py-str">"spark.sql.autoBroadcastJoinThreshold"</span>, -1)  <span class="py-com"># le réglage du TP7 (section 6)</span></pre>
+    <p>Exécutez-les et notez les messages. La cellule suivante montre qu'un réglage, lui, reste autorisé : <code>spark.sql.shuffle.partitions</code>.</p>
+    <div class="box box-info">
+      <strong>Spark Connect :</strong> sur le calcul serverless, le notebook n'est qu'un <em>client</em>. Il n'exécute pas Spark lui-même : il envoie la
+      description de vos DataFrames et de vos requêtes SQL à un moteur géré par Databricks, qui renvoie les résultats.
+    </div>
+    <div class="box box-metier">
+      <strong>Question 3 :</strong> recopiez les trois messages d'erreur. Expliquez, à l'aide de l'encadré ci-dessus, pourquoi l'API RDD et le <code>SparkContext</code> ne sont pas
+      disponibles. Pourquoi une plateforme partagée refuse-t-elle que l'utilisateur gère lui-même le cache ou les réglages de jointure ?
+      Que faudrait-il faire du code du TP5 pour l'exécuter ici ?
+    </div>
+<h2 id="6-delta-lake-une-table-que-l-on-peut-corriger">6. Delta Lake : une table que l'on peut corriger</h2>
+    <p>Au TP7, un dossier Parquet ne se modifiait pas : pour corriger deux ventes, il fallait réécrire les fichiers. Une table <strong>Delta</strong>
+    (le format par défaut de Databricks) ajoute aux fichiers Parquet un <strong>journal de transactions</strong> : les mises à jour deviennent possibles,
+    atomiques et historisées.</p>
+    <h3>6.1 Créer la table</h3>
+<pre class="python">gen.write.mode(<span class="py-str">"overwrite"</span>).saveAsTable(<span class="py-str">f"{CATALOGUE}.{SCHEMA}.ventes"</span>)</pre>
+<pre class="python">%sql
+<span class="py-kw">DESCRIBE</span> <span class="py-kw">DETAIL</span> workspace.tp8.ventes</pre>
+    <p>Dans <strong>Catalog</strong>, ouvrez la table <code>ventes</code> : parcourez les onglets <strong>Overview</strong> (colonnes),
+    <strong>Sample Data</strong> et <strong>History</strong>.</p>
+    <h3>6.2 Intégrer des corrections</h3>
+    <p>Cas de gestion : le service comptable signale deux ventes saisies sans la remise de 10 %, et une vente oubliée. Le notebook prépare une vue
+    <code>corrections</code> (deux lignes modifiées, une nouvelle), puis les intègre en une seule opération :</p>
+<pre class="python">%sql
+<span class="py-kw">MERGE</span> <span class="py-kw">INTO</span> workspace.tp8.ventes <span class="py-kw">AS</span> t
+<span class="py-kw">USING</span> corrections <span class="py-kw">AS</span> c
+<span class="py-kw">ON</span> t.id_vente = c.id_vente
+<span class="py-kw">WHEN</span> <span class="py-kw">MATCHED</span> <span class="py-kw">THEN</span> <span class="py-kw">UPDATE</span> <span class="py-kw">SET</span> *
+<span class="py-kw">WHEN</span> <span class="py-kw">NOT</span> <span class="py-kw">MATCHED</span> <span class="py-kw">THEN</span> <span class="py-kw">INSERT</span> *</pre>
+    <h3>6.3 L'historique et le voyage dans le temps</h3>
+<pre class="python">%sql
+<span class="py-kw">DESCRIBE</span> <span class="py-kw">HISTORY</span> workspace.tp8.ventes;
+
+<span class="py-kw">SELECT</span> id_vente, montant
+<span class="py-kw">FROM</span> workspace.tp8.ventes <span class="py-kw">VERSION</span> <span class="py-kw">AS</span> <span class="py-kw">OF</span> 0
+<span class="py-kw">WHERE</span> id_vente <span class="py-kw">IN</span> (1, 2, 3000001)</pre>
+    <p><em>Remplacez <code>0</code> par le numéro de version qui précède le <code>MERGE</code>, lu dans la colonne <code>version</code> de l'historique.</em>
+    Complétez enfin la cellule <code># À FAIRE</code> : l'écart de CA total entre la version d'avant le <code>MERGE</code> et la version actuelle.</p>
+    <div class="box box-metier">
+      <strong>Question 4 :</strong> d'après <code>DESCRIBE DETAIL</code>, quel est le format de la table, combien de fichiers la composent ? Quelles opérations l'historique
+      contient-il, et que dit-il du <code>MERGE</code> (lignes modifiées, insérées) ? Quel écart de CA trouvez-vous ? En quoi le <em>time travel</em>
+      intéresse-t-il un contrôleur de gestion ou un auditeur ? Comment auriez-vous fait cette correction avec le Parquet du TP7 ?
+    </div>
+<h2 id="7-un-tableau-de-bord-pour-la-direction-commerciale">7. Un tableau de bord pour la direction commerciale</h2>
+    <h3>7.1 Préparer les tables</h3>
+    <p>Complétez la cellule <code># À FAIRE</code> de la partie 7 du notebook : enregistrez le référentiel en table <code>workspace.tp8.regions</code>
+    (<code>saveAsTable</code>), puis créez la table <code>workspace.tp8.ca_region_mois</code> (colonnes <code>region</code>, <code>mois</code>,
+    <code>ca</code>) à partir de la table Delta <code>ventes</code>. Une requête <code>CREATE OR REPLACE TABLE … AS SELECT …</code> suffit.</p>
+    <h3>7.2 Le SQL Editor</h3>
+    <ol>
+      <li>Ouvrez <strong>SQL Editor</strong>. En haut, vérifiez que le calcul sélectionné est le SQL warehouse (souvent nommé <em>Serverless Starter Warehouse</em>).</li>
+      <li>Saisissez puis exécutez (<strong>Run</strong>) :</li>
+    </ol>
+<pre class="python"><span class="py-kw">SELECT</span> region, mois, ca
+<span class="py-kw">FROM</span> workspace.tp8.ca_region_mois
+<span class="py-kw">ORDER</span> <span class="py-kw">BY</span> region, mois</pre>
+    <h3>7.3 Le tableau de bord</h3>
+    <ol>
+      <li>Ouvrez <strong>Dashboards</strong>, puis <strong>Create dashboard</strong>.</li>
+      <li>Onglet <strong>Data</strong> : <strong>Create from SQL</strong>, collez la requête ci-dessus, exécutez-la.</li>
+      <li>Revenez sur la page du tableau de bord (onglet <strong>Canvas</strong> ou nom de la page) et ajoutez une <strong>visualisation</strong> :
+        graphique en <strong>barres</strong>, axe X <code>region</code>, axe Y <code>SUM(ca)</code>.</li>
+      <li>Ajoutez une seconde visualisation : une <strong>courbe</strong>, axe X <code>mois</code>, axe Y <code>SUM(ca)</code>, couleur par <code>region</code>.</li>
+      <li>Ajoutez un <strong>filtre</strong> sur <code>region</code>, donnez un titre au tableau de bord, puis cliquez sur <strong>Publish</strong>.</li>
+    </ol>
+    <div class="box box-metier">
+      <strong>Question 5 :</strong> à qui ce tableau de bord est-il destiné, et que lui épargne-t-il par rapport aux TP précédents ? Sur quel calcul s'exécutent les requêtes du
+      tableau de bord, et sur quel calcul s'exécute votre notebook ? Pourquoi séparer les deux ? Faites le lien avec Hue au TP4.
+    </div>
+<h2 id="8-un-traitement-planifie-chaque-nuit">8. Un traitement planifié chaque nuit</h2>
+    <p>Le tableau de bord doit être à jour chaque matin, quelles que soient les corrections intégrées dans la journée. On planifie donc le recalcul de
+    <code>ca_region_mois</code>.</p>
+    <h3>8.1 Le notebook du job</h3>
+    <ol>
+      <li>Dans <strong>Workspace</strong> → <strong>Home</strong>, créez un notebook (<strong>Create → Notebook</strong>) nommé <code>tp8_job</code>.</li>
+      <li>Écrivez-y une cellule qui recrée <code>workspace.tp8.ca_region_mois</code> à partir de <code>ventes</code> et <code>regions</code>
+        (la requête de la section 7.1) et qui affiche le nombre de lignes produites.</li>
+      <li>Exécutez-le une fois à la main pour le vérifier.</li>
+    </ol>
+    <h3>8.2 Créer et planifier le job</h3>
+    <ol>
+      <li>Ouvrez <strong>Jobs &amp; Pipelines</strong>, puis <strong>Create → Job</strong>.</li>
+      <li>Nommez le job <code>TP8 - CA par région (nuit)</code>. Pour la première tâche : <strong>Type</strong> <em>Notebook</em>,
+        <strong>Path</strong> votre notebook <code>tp8_job</code>, <strong>Compute</strong> <em>Serverless</em>. Cliquez sur <strong>Create task</strong>.</li>
+      <li>Dans le panneau de droite, <strong>Schedules &amp; Triggers</strong> → <strong>Add trigger</strong> → type <strong>Scheduled</strong> :
+        tous les jours à 6 h 00, fuseau horaire <code>Africa/Dakar</code> (UTC). Enregistrez.</li>
+      <li>Cliquez sur <strong>Run now</strong>, puis ouvrez l'onglet <strong>Runs</strong> pour suivre l'exécution et lire sa sortie.</li>
+      <li>Une fois l'exécution réussie, <strong>mettez la planification en pause</strong> (<strong>Pause</strong>) pour préserver votre quota.</li>
+    </ol>
+    <div class="box box-metier">
+      <strong>Question 6 :</strong> comparez ce job avec ce qu'il aurait fallu faire au TP5 ou au TP6 pour obtenir le même résultat (<code>spark-submit</code>, planificateur
+      du système, journaux, relance en cas d'échec). Que vous apporte l'onglet <strong>Runs</strong> ? Que se passe-t-il pour le tableau de bord
+      si l'exécution de la nuit échoue ?
+    </div>
+<h2 id="9-synthese-construire-ou-acheter">9. Synthèse : construire ou acheter ?</h2>
+    <p>Complétez le tableau à partir de votre expérience des quatre derniers TP.</p>
+    <table>
+      <thead><tr><th>Critère</th><th>TP5 — Spark sur une VM</th><th>TP6 — Spark sur 4 VM</th><th>TP7 — DataFrames sur VM</th><th>TP8 — Databricks</th></tr></thead>
+      <tbody>
+        <tr><td>Temps d'installation et de configuration</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>Temps du CA par ville (3 millions de ventes)</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>Ce que l'on peut observer (interfaces, journaux)</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>Ce que l'on peut régler</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>API disponibles (RDD, DataFrame, SQL)</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>Correction des données, historique</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>Coût pour une entreprise, compétences nécessaires</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>Où sont les données ?</td><td></td><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+    <div class="box box-metier">
+      <strong>Question 7 :</strong> une PME dakaroise de la distribution veut analyser deux ans de tickets de caisse. Rédigez une recommandation d'une quinzaine de lignes :
+      plateforme installée par ses soins (TP5 à TP7) ou service managé comme Databricks (TP8) ? Appuyez-vous sur le tableau, et abordez au moins
+      le coût, les compétences de l'équipe, la dépendance au fournisseur et la localisation des données (protection des données personnelles).
+    </div>
+<h2 id="10-resolution-des-problemes-courants-depannage">10. Résolution des problèmes courants (Dépannage)</h2>
+    <table>
+      <thead><tr><th>Symptôme</th><th>Cause probable</th><th>Solution</th></tr></thead>
+      <tbody>
+        <tr><td>Une cellule ne s'exécute pas : <em>« Notebook detached »</em> ou bouton <strong>Connect</strong> affiché</td><td>Notebook non relié à un calcul</td><td><strong>Connect</strong> → <strong>Serverless</strong>.</td></tr>
+        <tr><td><em>« [SCHEMA_NOT_FOUND] »</em> ou <em>« [NO_SUCH_CATALOG_EXCEPTION] »</em></td><td>Catalogue nommé autrement que <code>workspace</code>, ou partie 2 non exécutée</td><td>Vérifiez le nom dans <strong>Catalog</strong>, corrigez <code>CATALOGUE</code> et les cellules <code>%sql</code>, réexécutez la partie 2.</td></tr>
+        <tr><td><em>« [PATH_NOT_FOUND] … regions.csv »</em></td><td>Fichier téléversé ailleurs ou sous un autre nom</td><td>Section 3.3 : destination <code>workspace/tp8/donnees</code>, nom exact <code>regions.csv</code>.</td></tr>
+        <tr><td><code>NameError: name 'gen' is not defined</code> (ou <code>ventes</code>, <code>regions</code>)</td><td>Session redémarrée : les variables Python sont perdues</td><td>Réexécutez les cellules de la partie 1 jusqu'à la cellule qui définit la variable (menu <strong>Run all above</strong>).</td></tr>
+        <tr><td>Le <code>MERGE</code> échoue : <em>« Table or view not found: corrections »</em></td><td>La cellule Python qui crée la vue n'a pas été exécutée dans cette session</td><td>Exécutez-la juste avant le <code>MERGE</code>.</td></tr>
+        <tr><td><em>« [DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE] »</em></td><td>La vue <code>corrections</code> contient deux fois le même <code>id_vente</code></td><td>Recréez la vue (cellule de la section 6.2), une seule fois.</td></tr>
+        <tr><td>Le calcul est coupé, message de quota dépassé</td><td>Quota quotidien de la Free Edition atteint</td><td>Attendez le lendemain ; vos données et notebooks sont conservés. Évitez les exécutions répétées inutiles.</td></tr>
+        <tr><td>Le job échoue</td><td>Tables <code>ventes</code> ou <code>regions</code> absentes, ou erreur dans <code>tp8_job</code></td><td>Onglet <strong>Runs</strong> → cliquez sur l'exécution → lisez la sortie de la tâche.</td></tr>
+      </tbody>
+    </table>
+<h2 id="11-livrable-attendu">11. Livrable attendu</h2>
+    <ul>
+      <li>Le notebook <code>tp8_etudiant</code> complété et exécuté, exporté depuis Databricks (menu <strong>File → Export → IPython Notebook</strong>) ;</li>
+      <li>un court rapport (PDF ou Markdown) avec les réponses aux <strong>questions 1 à 7</strong>, les trois messages d'erreur de la section 5 et le
+        tableau de synthèse de la section 9 ;</li>
+      <li>une capture du <strong>tableau de bord publié</strong> et une de l'onglet <strong>Runs</strong> du job montrant une exécution réussie ;</li>
+      <li>la recommandation de la question 7, rédigée pour un dirigeant non informaticien.</li>
+    </ul>
+<h2 id="annexes">Annexes</h2>
+    <h3>Annexe A — Objets créés dans Unity Catalog</h3>
+<pre class="plain">workspace                          ← catalogue
+└── tp8                            ← schéma
+    ├── donnees                    ← volume
+    │   ├── purchases.txt          (19 ventes)
+    │   ├── regions.csv            (référentiel, téléversé)
+    │   └── purchases_big/         (3 millions de ventes, fichiers part-…)
+    ├── ventes                     ← table Delta (avec id_vente)
+    ├── regions                    ← table Delta
+    └── ca_region_mois             ← table Delta, recalculée par le job</pre>
+    <h3>Annexe B — Commandes utiles dans un notebook</h3>
+    <table>
+      <thead><tr><th>Commande</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>display(df)</code></td><td>tableau interactif, avec graphiques</td></tr>
+        <tr><td><code>dbutils.fs.ls("/Volumes/…")</code></td><td>lister le contenu d'un volume</td></tr>
+        <tr><td><code>%sql</code> en tête de cellule</td><td>cellule exécutée en SQL</td></tr>
+        <tr><td><code>spark.table("catalogue.schema.table")</code></td><td>lire une table Unity Catalog en DataFrame</td></tr>
+        <tr><td><code>df.write.mode("overwrite").saveAsTable(…)</code></td><td>enregistrer un DataFrame en table Delta</td></tr>
+        <tr><td><code>DESCRIBE DETAIL</code>, <code>DESCRIBE HISTORY</code></td><td>description et historique d'une table Delta</td></tr>
+        <tr><td><code>SELECT … VERSION AS OF n</code></td><td>lire une version passée (time travel)</td></tr>
+        <tr><td><code>RESTORE TABLE … TO VERSION AS OF n</code></td><td>revenir à une version passée</td></tr>
+      </tbody>
+    </table>
+    <h3>Annexe C — Pour aller plus loin</h3>
+    <ul>
+      <li><strong>Genie</strong> : posez des questions en langage naturel sur vos tables (« quel est le CA de la région Sud en mars ? ») et comparez la requête
+        SQL générée avec la vôtre.</li>
+      <li>Documentation : <a href="https://docs.databricks.com/aws/en/getting-started/free-edition-limitations">limites de la Free Edition</a>,
+        <a href="https://docs.databricks.com/aws/en/compute/serverless/limitations">limites du calcul serverless</a>.</li>
+    </ul>
+    <div class="box box-success">
+      <strong>Félicitations !</strong> Vous avez parcouru toute la chaîne : installer Hadoop, monter un cluster, le porter dans le cloud, interroger en SQL,
+      calculer avec Spark, puis utiliser une plateforme managée. Vous savez maintenant ce qu'une telle plateforme fait à votre place, et ce que cela coûte.
+    </div>
+<div class="pager"><a class="prev" href="tp7.html"><small>← Précédent</small>TP7 — DataFrames et Spark SQL</a><span></span></div>
+  </main>
+</div>
+<footer class="site-footer">ISI — Institut Supérieur d'Informatique · Master 1 — IAGE · Big Data &amp; Analyse de données · Année universitaire 2026-2027</footer>
+<script src="assets/tp.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  if (window.mermaid) {
+    mermaid.initialize({
+      startOnLoad: true, theme: 'dark', securityLevel: 'loose',
+      flowchart: { nodeSpacing: 70, rankSpacing: 100, padding: 30, htmlLabels: true, curve: 'linear' },
+      themeVariables: {
+        fontFamily: '-apple-system, Segoe UI, Roboto, Arial, sans-serif',
+        lineColor: '#f4b183', primaryColor: '#2c4f86', primaryTextColor: '#f1f5f9', primaryBorderColor: '#f4b183',
+        secondaryTextColor: '#e5e7eb', tertiaryTextColor: '#e5e7eb', textColor: '#e5e7eb',
+        mainBkg: '#2c4f86', nodeBorder: '#f4b183', clusterBkg: '#1a2f52', clusterBorder: '#3a5583',
+        titleColor: '#f4b183', edgeLabelBackground: '#13233f'
+      }
+    });
+  }
+</script>
+
+
+</body>
+</html>

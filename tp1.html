@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TP1 — Installation de Hadoop en pseudo-distribué — ISI M1 IAGE</title>
-  <meta name="description" content="TP1 du module Big Data (ISI, Master 1 IAGE) : installation d'Apache Hadoop 3.4.3 en mode pseudo-distribué.">
+  <meta name="description" content="TP1 du module Big Data (ISI, Master 1 IAGE) : installation d'Apache Hadoop 3.5.0 en mode pseudo-distribué.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet">
@@ -20,6 +20,10 @@
       <a href="tp2.html">TP2</a>
       <a href="tp3.html">TP3</a>
       <a href="tp4.html">TP4</a>
+      <a href="tp5.html">TP5</a>
+      <a href="tp6.html">TP6</a>
+      <a href="tp7.html">TP7</a>
+      <a href="tp8.html">TP8</a>
     </nav>
   </div>
 </header>
@@ -30,7 +34,7 @@
       <p class="eyebrow">Travaux pratiques n°1 · Big Data &amp; Analyse de données</p>
       <h1>Installer Apache Hadoop en mode pseudo-distribué</h1>
       <p class="lead">Installer HDFS, YARN et MapReduce sur une seule machine, puis valider l'installation par un premier job.</p>
-      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Hadoop 3.4.3</span><span class="chip">Java 21</span><span class="chip">Ubuntu 24.04 LTS</span><span class="chip">Octobre 2026</span></div>
+      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Hadoop 3.5.0</span><span class="chip">Java 21</span><span class="chip">Ubuntu Server 26.04 LTS</span><span class="chip">Octobre 2026</span></div>
     </div>
   </div>
 </header>
@@ -62,7 +66,7 @@
 
     <div class="box box-info">
       <strong>Objectif du TP :</strong> Ce guide détaille l'installation pas à pas d'<strong>Apache Hadoop version</strong>
-      <span class="badge badge-hadoop">3.4.3</span> sur le système d'exploitation <strong>Ubuntu 24.04 LTS</strong>.
+      <span class="badge badge-hadoop">3.5.0</span> sur le système d'exploitation <strong>Ubuntu Server 26.04 LTS</strong>.
       Nous utiliserons le <strong>Mode Pseudo-Distribué</strong>.
     </div>
 
@@ -85,8 +89,8 @@
       <tbody>
         <tr>
           <td>Système d'exploitation</td>
-          <td>Ubuntu 24.04 LTS (64-bit)</td>
-          <td>Ubuntu 24.04 LTS (64-bit)</td>
+          <td>Ubuntu Server 26.04 LTS (64-bit)</td>
+          <td>Ubuntu Server 26.04 LTS (64-bit)</td>
         </tr>
         <tr>
           <td>Mémoire RAM</td>
@@ -118,12 +122,24 @@
 
     <pre>sudo apt install openjdk-21-jdk -y
 </pre>
+    <div class="box box-info">
+      <strong>Ubuntu Server 26.04 :</strong> le JDK par défaut de cette version est <strong>Java 25</strong> (paquet <code>default-jdk</code>).
+      N'installez donc pas <code>default-jdk</code> : demandez explicitement <code>openjdk-21-jdk</code>, comme ci-dessus.
+      Ce paquet est dans le dépôt <em>universe</em>, activé par défaut sur Ubuntu Server.
+    </div>
+
+    <div class="box box-warning">
+      <strong>Java et Hadoop 3.5.0 :</strong> la documentation officielle de Hadoop 3.5.0 indique que les démons (côté serveur) requièrent
+      <strong>Java 17</strong>, Java 21 n'étant officiellement supporté que côté client. Le module utilise Java 21, avec lequel
+      Hadoop 3.5.0 a été testé pour ces TP. En cas de comportement anormal d'un démon, passez à Java 17 en suivant la
+      <a href="#10-passer-a-java-17">section 10</a> : Hadoop et ses données sont conservés, rien n'est à réinstaller.
+    </div>
 
     <p>Vérifiez l'installation :</p>
     <pre>java -version
 </pre>
     <p>
-      <em>Résultat attendu (similaire à) : <code>openjdk version "21.0.4" ...</code></em>
+      <em>Résultat attendu (similaire à) : <code>openjdk version "21.0.x" ...</code></em>
     </p>
 
     <p>Identifiez le chemin d'installation de Java pour la configuration future :</p>
@@ -143,7 +159,7 @@ readlink -f $(which java)
 
     <h3>3.2 Création de l'utilisateur hadoop</h3>
     <p>Il est recommandé de créer un utilisateur système dédié pour isoler l'installation Hadoop.</p>
-    <pre>sudo adduser --disabled-password --gecos "" hadoop
+    <pre>sudo adduser --disabled-password --comment "" hadoop
 sudo usermod -aG sudo hadoop
 sudo passwd hadoop
 # Entrez un mot de passe simple (ex: hadoop) pour le TP
@@ -170,17 +186,17 @@ ssh localhost
       l'empreinte. Si vous êtes connecté sans demande de mot de passe, la configuration est réussie. Tapez
       <code>exit</code> pour revenir au shell normal si nécessaire.
     </div>
-<h2 id="4-telechargement-et-installation-de-hadoop-3-4-3">4. Téléchargement et installation de Hadoop 3.4.3</h2>
+<h2 id="4-telechargement-et-installation-de-hadoop-3-5-0">4. Téléchargement et installation de Hadoop 3.5.0</h2>
     <p>Nous allons télécharger la version binaire stable depuis les miroirs Apache.</p>
 
     <pre># Téléchargement
-wget https://archive.apache.org/dist/hadoop/common/hadoop-3.4.3/hadoop-3.4.3.tar.gz
+wget https://archive.apache.org/dist/hadoop/common/hadoop-3.5.0/hadoop-3.5.0.tar.gz
 
 # Extraction
-tar -xvzf hadoop-3.4.3.tar.gz
+tar -xvzf hadoop-3.5.0.tar.gz
 
 # Déplacement vers /opt 
-sudo mv hadoop-3.4.3 /opt/hadoop
+sudo mv hadoop-3.5.0 /opt/hadoop
 
 # Attribution des droits à l'utilisateur hadoop
 sudo chown -R hadoop:hadoop /opt/hadoop
@@ -217,7 +233,7 @@ export HADOOP_OPTS="-Djava.library.path=$HADOOP_HOME/lib/native"
     <p>Testez si Hadoop est reconnu :</p>
     <pre>hadoop version
 </pre>
-    <p><em>Vous devriez voir : Hadoop 3.4.3</em></p>
+    <p><em>Vous devriez voir : Hadoop 3.5.0</em></p>
 
     <p>Enfin, éditez le fichier de configuration interne <code>hadoop-env.sh</code> pour forcer le chemin Java :</p>
     <pre>nano $HADOOP_HOME/etc/hadoop/hadoop-env.sh
@@ -231,16 +247,21 @@ export HADOOP_OPTS="-Djava.library.path=$HADOOP_HOME/lib/native"
     <h3>6.1 Création des répertoires de données HDFS</h3>
     <pre>sudo mkdir -p /home/hadoop/hdfs/namenode
 sudo mkdir -p /home/hadoop/hdfs/datanode
-sudo chown -R hadoop:hadoop /home/hadoop/hdfs/
+sudo mkdir -p /home/hadoop/hadoop-tmp
+sudo chown -R hadoop:hadoop /home/hadoop/hdfs/ /home/hadoop/hadoop-tmp
 </pre>
 
     <h3>6.2 Fichier core-site.xml</h3>
-    <p>Configure l'adresse du NameNode (le maître du système de fichiers).</p>
+    <p>Configure l'adresse du NameNode (le maître du système de fichiers) et le dossier des fichiers de travail de Hadoop. Sur Ubuntu Server 26.04, <code>/tmp</code> est en mémoire vive (tmpfs) : petit et vidé à chaque redémarrage. On place donc ces fichiers sur le disque, dans <code>/home/hadoop/hadoop-tmp</code>.</p>
     <p><code>nano $HADOOP_HOME/etc/hadoop/core-site.xml</code></p>
     <pre class="xml">&lt;configuration&gt;
     &lt;property&gt;
         &lt;name&gt;fs.defaultFS&lt;/name&gt;
         &lt;value&gt;hdfs://localhost:8020&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+        &lt;name&gt;hadoop.tmp.dir&lt;/name&gt;
+        &lt;value&gt;/home/hadoop/hadoop-tmp&lt;/value&gt;
     &lt;/property&gt;
 &lt;/configuration&gt;
 </pre>
@@ -436,7 +457,7 @@ hdfs dfs -mkdir input
 hdfs dfs -put $HADOOP_HOME/etc/hadoop/*.xml input
 
 # Exécution du job MapReduce
-hadoop jar $HADOOP_HOME/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.4.3.jar grep input output 'dfs[a-z.]+'
+hadoop jar $HADOOP_HOME/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.5.0.jar grep input output 'dfs[a-z.]+'
 
 # Affichage des résultats
 hdfs dfs -cat output/*
@@ -482,6 +503,86 @@ hdfs dfs -cat output/*
         </tr>
       </tbody>
     </table>
+<h2 id="10-passer-a-java-17">10. Passer à Java 17 (si nécessaire)</h2>
+    <p>
+      Cette section sert si un démon se comporte mal sous Java 21, ou si l'on veut s'en tenir à la configuration officielle de
+      Hadoop 3.5.0 (<strong>Java 17 côté serveur</strong>). Les deux JDK peuvent cohabiter sur la machine : on installe Java 17,
+      puis on indique à Hadoop de l'utiliser. <strong>Ni Hadoop ni les données HDFS ne sont touchés</strong> : pas de réinstallation,
+      pas de nouveau formatage du NameNode.
+    </p>
+
+    <h3>10.1 Arrêter le cluster</h3>
+    <p>Toujours avec l'utilisateur <code>hadoop</code> :</p>
+    <pre>stop-all.sh
+jps
+</pre>
+    <p><em>Seul <code>Jps</code> doit rester affiché.</em></p>
+
+    <h3>10.2 Installer OpenJDK 17</h3>
+    <pre>sudo apt update
+sudo apt install openjdk-17-jdk -y
+
+# Les deux JDK sont maintenant présents
+ls /usr/lib/jvm/
+</pre>
+    <p><em>Résultat attendu (similaire à) : <code>java-1.17.0-openjdk-amd64  java-17-openjdk-amd64  java-1.21.0-openjdk-amd64  java-21-openjdk-amd64</code></em></p>
+    <div class="box box-info">
+      <strong>Processeur ARM :</strong> sur une VM ARM (par exemple sur un Mac Apple Silicon), le dossier se termine par
+      <code>-arm64</code> au lieu de <code>-amd64</code>. Utilisez dans toute la suite le nom exact affiché par <code>ls /usr/lib/jvm/</code>.
+    </div>
+
+    <h3>10.3 Choisir Java 17 par défaut</h3>
+    <p>Ubuntu gère plusieurs versions de Java avec les « alternatives ». Choisissez Java 17 pour les commandes <code>java</code> et <code>javac</code> :</p>
+    <pre>sudo update-alternatives --config java
+sudo update-alternatives --config javac
+</pre>
+    <p>Chaque commande affiche une liste numérotée : tapez le numéro de la ligne qui contient <code>java-17-openjdk</code>, puis Entrée. Vérifiez :</p>
+    <pre>java -version
+</pre>
+    <p><em>Résultat attendu (similaire à) : <code>openjdk version "17.0.x" ...</code></em></p>
+
+    <h3>10.4 Mettre à jour JAVA_HOME</h3>
+    <p>Le chemin de Java est écrit à <strong>deux endroits</strong> depuis la section 5 : <code>~/.bashrc</code> et <code>hadoop-env.sh</code>.
+    Remplacez-le dans les deux fichiers en une commande :</p>
+    <pre>sed -i 's#java-21-openjdk-amd64#java-17-openjdk-amd64#' ~/.bashrc $HADOOP_HOME/etc/hadoop/hadoop-env.sh
+
+# Vérification
+grep -n openjdk ~/.bashrc $HADOOP_HOME/etc/hadoop/hadoop-env.sh
+source ~/.bashrc
+echo $JAVA_HOME
+</pre>
+    <p><em>Les deux fichiers et la variable doivent indiquer <code>/usr/lib/jvm/java-17-openjdk-amd64</code>.</em></p>
+    <div class="box box-warning">
+      <strong>Pourquoi les deux fichiers ?</strong> <code>~/.bashrc</code> sert à votre terminal (commandes <code>hadoop</code>, <code>hdfs</code>…) ;
+      <code>hadoop-env.sh</code> sert aux démons lancés par <code>start-all.sh</code> via SSH, qui ne lisent pas toujours votre <code>.bashrc</code>.
+      Si l'un des deux reste en Java 21, les démons et vos commandes n'utiliseront pas la même version.
+    </div>
+
+    <h3>10.5 Redémarrer et vérifier</h3>
+    <pre>start-all.sh
+jps
+
+# Quel Java utilisent les démons ? (un compte par JDK)
+ps -eo args | grep -o '/usr/lib/jvm/[^/]*' | sort | uniq -c
+</pre>
+    <p><em>Résultat attendu : les <strong>5 démons</strong> dans <code>jps</code>, et une seule ligne <code>5 /usr/lib/jvm/java-17-openjdk-amd64</code>.</em></p>
+    <p>Relancez enfin le job d'exemple de la section 8.4 (en supprimant d'abord l'ancienne sortie) :</p>
+    <pre>hdfs dfs -rm -r output
+hadoop jar $HADOOP_HOME/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.5.0.jar grep input output 'dfs[a-z.]+'
+hdfs dfs -cat output/*
+</pre>
+    <div class="box box-success">
+      Si le job affiche le même résultat qu'avant, le passage à Java 17 est terminé : vos données HDFS sont intactes.
+    </div>
+    <div class="box box-info">
+      <strong>Et pour les autres TP ?</strong>
+      <ul>
+        <li><strong>TP2 et TP3 :</strong> refaites les sections 10.1 à 10.5 sur <strong>chaque nœud</strong> (master et workers) : tous doivent utiliser le même Java.
+          Le projet Maven compile pour Java 17 (<code>maven.compiler.release</code> = 17) et fonctionne donc sans changement.</li>
+        <li><strong>TP5 (Spark) :</strong> rien à faire, Spark 4.2 utilise le <code>JAVA_HOME</code> défini ici et accepte Java 17 comme Java 21.</li>
+        <li><strong>Revenir à Java 21 :</strong> même procédure en sens inverse (<code>update-alternatives</code>, puis <code>sed</code> en échangeant 17 et 21).</li>
+      </ul>
+    </div>
 <h2 id="annexes">Annexes</h2>
 
     <h3>Annexe A — Récapitulatif des ports Hadoop</h3>

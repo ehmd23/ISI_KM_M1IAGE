@@ -52,6 +52,10 @@
       <a href="tp2.html">TP2</a>
       <a href="tp3.html">TP3</a>
       <a href="tp4.html">TP4</a>
+      <a href="tp5.html">TP5</a>
+      <a href="tp6.html">TP6</a>
+      <a href="tp7.html">TP7</a>
+      <a href="tp8.html">TP8</a>
     </nav>
   </div>
 </header>
@@ -61,15 +65,16 @@
     <div class="logo-tile"><img src="logo.jpg" alt="Logo ISI"></div>
     <div>
       <p class="eyebrow">Module Big Data &amp; Analyse de données</p>
-      <h1>Travaux pratiques Hadoop et Hive</h1>
-      <p class="lead">Quatre TP progressifs : installer Hadoop sur un poste, monter un cluster, le transposer dans le cloud, puis interroger les données en SQL. Fil rouge : les ventes d'une enseigne, analysées par ville, catégorie et moyen de paiement.</p>
+      <h1>Travaux pratiques Hadoop, Hive et Spark</h1>
+      <p class="lead">Huit TP progressifs : installer Hadoop sur un poste, monter un cluster, le transposer dans le cloud, interroger les données en SQL, calculer en mémoire avec Spark sur une machine puis sur le cluster, passer aux DataFrames, et finir sur une plateforme managée (Databricks). Fil rouge : les ventes d'une enseigne, analysées par ville, catégorie et moyen de paiement.</p>
       <div class="chips">
         <span class="chip"><b>Master 1 — IAGE</b></span>
         <span class="chip">Informatique Appliquée à la Gestion des Entreprises</span>
         <span class="chip">Année 2026-2027</span>
-        <span class="chip">Hadoop 3.4.3</span>
+        <span class="chip">Hadoop 3.5.0</span>
         <span class="chip">Java 21 · Python 3</span>
         <span class="chip">Hive 4.2.0</span>
+        <span class="chip">Spark 4.2.0</span>
       </div>
     </div>
   </div>
@@ -90,7 +95,7 @@
         <li>Configuration de HDFS, YARN et MapReduce</li>
         <li>Validation par un job d'exemple</li>
       </ul>
-      <div class="tags"><span class="tag">Hadoop 3.4.3</span><span class="tag">Ubuntu 24.04</span><span class="tag">Pseudo-distribué</span></div>
+      <div class="tags"><span class="tag">Hadoop 3.5.0</span><span class="tag">Ubuntu 26.04</span><span class="tag">Pseudo-distribué</span></div>
       <a class="btn" href="tp1.html">Ouvrir le TP1 →</a>
     </article>
 
@@ -135,6 +140,62 @@
       <div class="tags"><span class="tag">Hive 4.2.0</span><span class="tag">Hue</span><span class="tag">Docker</span></div>
       <a class="btn" href="tp4.html">Ouvrir le TP4 →</a>
     </article>
+
+    <article class="card tp-card">
+      <div class="tp-num">5</div>
+      <h3>Installer Spark sur la VM du TP1 et calculer en mémoire</h3>
+      <p>Spark sur le Hadoop du TP1 : exécution sur YARN, RDD, DAG, shuffle et cache.</p>
+      <div class="tp-q"><b>Question métier</b>Peut-on accélérer les analyses sans changer de cluster ni d'infrastructure ?</div>
+      <ul>
+        <li>Spark 4.2.0 dans <code>/opt/spark</code>, configuré pour YARN</li>
+        <li>CA par ville en RDD, lu dans l'interface 4040</li>
+        <li>Cache, shuffle et soumission avec <code>spark-submit</code></li>
+      </ul>
+      <div class="tags"><span class="tag">Spark 4.2.0</span><span class="tag">PySpark</span><span class="tag">YARN</span></div>
+      <a class="btn" href="tp5.html">Ouvrir le TP5 →</a>
+    </article>
+
+    <article class="card tp-card">
+      <div class="tp-num">6</div>
+      <h3>Spark sur le cluster du TP2 : calculer à plusieurs machines</h3>
+      <p>Spark sur les 4 VM du TP2 : trois executors répartis, localité des données, shuffle réseau et reprise après panne.</p>
+      <div class="tp-q"><b>Question métier</b>Le tableau de bord du matin est-il produit même si une machine tombe en panne ?</div>
+      <ul>
+        <li>Spark sur le master, executors sur les trois workers</li>
+        <li>Localité des blocs HDFS et shuffle sur le réseau</li>
+        <li>Panne d'un worker et recalcul par lignage</li>
+      </ul>
+      <div class="tags"><span class="tag">Spark 4.2.0</span><span class="tag">Cluster 4 nœuds</span><span class="tag">YARN</span></div>
+      <a class="btn" href="tp6.html">Ouvrir le TP6 →</a>
+    </article>
+
+    <article class="card tp-card">
+      <div class="tp-num">7</div>
+      <h3>DataFrames et Spark SQL : refaire le TP5, et comparer</h3>
+      <p>Le fil rouge du TP5 réécrit en DataFrame et en SQL, les plans de Catalyst, Parquet, jointures et fenêtres.</p>
+      <div class="tp-q"><b>Question métier</b>Un analyste qui connaît le SQL peut-il exploiter Spark aussi bien qu'un développeur ?</div>
+      <ul>
+        <li>Schéma, DataFrame et vues SQL</li>
+        <li>Plans de Catalyst, AQE, broadcast join</li>
+        <li>Parquet partitionné et comparaison avec les RDD</li>
+      </ul>
+      <div class="tags"><span class="tag">Spark SQL</span><span class="tag">DataFrame</span><span class="tag">Parquet</span></div>
+      <a class="btn" href="tp7.html">Ouvrir le TP7 →</a>
+    </article>
+
+    <article class="card tp-card">
+      <div class="tp-num">8</div>
+      <h3>Le TP7 sur Databricks : Spark sans installation</h3>
+      <p>Databricks Free Edition : Unity Catalog, notebook serverless, Delta Lake, tableau de bord et job planifié.</p>
+      <div class="tp-q"><b>Question métier</b>Faut-il construire sa plateforme Big Data, ou l'acheter en service ?</div>
+      <ul>
+        <li>Volumes et tables dans Unity Catalog</li>
+        <li>Corrections avec MERGE et historique Delta</li>
+        <li>Tableau de bord et traitement nocturne</li>
+      </ul>
+      <div class="tags"><span class="tag">Databricks</span><span class="tag">Delta Lake</span><span class="tag">Serverless</span></div>
+      <a class="btn" href="tp8.html">Ouvrir le TP8 →</a>
+    </article>
   </div>
 
   <h2 class="section-title">Avant de commencer</h2>
@@ -143,10 +204,14 @@
     <div class="card">
       <h3>Matériel et comptes</h3>
       <ul>
-        <li><strong>TP1 :</strong> Ubuntu 24.04 (machine ou VM), 8 Go de RAM recommandés.</li>
+        <li><strong>TP1 :</strong> Ubuntu Server 26.04 LTS (machine ou VM), 8 Go de RAM recommandés.</li>
         <li><strong>TP2 :</strong> VirtualBox et un poste de <strong>16 Go de RAM</strong> recommandés (4 VM de 2 Go).</li>
         <li><strong>TP3 :</strong> un compte AWS. Les instances sont facturées à l'heure : arrêtez-les après chaque séance.</li>
         <li><strong>TP4 :</strong> Docker Engine et Docker Compose V2, 8 Go de RAM disponibles pour Docker.</li>
+        <li><strong>TP5 :</strong> la VM du TP1 (8 Go de RAM recommandés) et 5 Go d'espace disque libre.</li>
+        <li><strong>TP6 :</strong> les 4 VM du TP2, passées à <strong>3 Go</strong> chacune (poste de 16 Go de RAM).</li>
+        <li><strong>TP7 :</strong> la VM du TP5 (Spark 4.2.0 sur YARN) et les données du TP5 dans HDFS.</li>
+        <li><strong>TP8 :</strong> un navigateur web et un compte Databricks Free Edition (gratuit, sans carte bancaire).</li>
       </ul>
     </div>
     <div class="card">
@@ -158,6 +223,10 @@
           <tr><td>TP2</td><td>Ch. 2 — Architecture distribuée · Ch. 4 — MapReduce</td></tr>
           <tr><td>TP3</td><td>Ch. 1 et 3 — Coûts, sur site ou cloud</td></tr>
           <tr><td>TP4</td><td>Ch. 5 — Hive et Hue</td></tr>
+          <tr><td>TP5</td><td>Ch. 6 — Spark : RDD, DAG, cache</td></tr>
+          <tr><td>TP6</td><td>Ch. 6 — Spark sur cluster : localité, shuffle, résilience</td></tr>
+          <tr><td>TP7</td><td>Ch. 7 — Spark SQL et DataFrames : Catalyst, Parquet</td></tr>
+          <tr><td>TP8</td><td>Ch. 7 — Databricks, Delta Lake</td></tr>
         </tbody>
       </table>
     </div>

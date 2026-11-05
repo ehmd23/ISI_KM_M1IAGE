@@ -20,6 +20,10 @@
       <a href="tp2.html">TP2</a>
       <a href="tp3.html">TP3</a>
       <a href="tp4.html">TP4</a>
+      <a href="tp5.html">TP5</a>
+      <a href="tp6.html">TP6</a>
+      <a href="tp7.html">TP7</a>
+      <a href="tp8.html">TP8</a>
     </nav>
   </div>
 </header>
@@ -30,7 +34,7 @@
       <p class="eyebrow">Travaux pratiques n°3 · Big Data &amp; Analyse de données</p>
       <h1>Déployer le cluster Hadoop dans le cloud AWS (EC2)</h1>
       <p class="lead">Le même cluster de 4 nœuds que dans le TP2, mais sur des instances EC2 louées à l'heure — et le même job MapReduce pour comparer.</p>
-      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Hadoop 3.4.3</span><span class="chip">Java 21</span><span class="chip">Python 3</span><span class="chip">Ubuntu 24.04 LTS</span><span class="chip">AWS EC2</span><span class="chip">Octobre 2026</span></div>
+      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Hadoop 3.5.0</span><span class="chip">Java 21</span><span class="chip">Python 3</span><span class="chip">Ubuntu Server 26.04 LTS</span><span class="chip">AWS EC2</span><span class="chip">Octobre 2026</span></div>
     </div>
   </div>
 </header>
@@ -42,7 +46,7 @@
 <div class="box box-metier"><strong>Coût :</strong> les instances <code>t3.medium</code> ne font pas partie de l’offre gratuite et sont facturées à l’heure. <strong>Arrêtez-les (Stop)</strong> à la fin de chaque séance et <strong>supprimez-les (Terminate)</strong> à la fin du TP. C’est l’illustration concrète du modèle OPEX vu au chapitre 3 : on paie ce qu’on consomme… y compris ce qu’on oublie d’éteindre.</div>
 <p>1. Dans la console AWS EC2, lancez <strong>4 instances</strong> avec les paramètres suivants :</p>
 <ul>
-<li>AMI : Ubuntu Server 24.04 LTS</li>
+<li>AMI : Ubuntu Server 26.04 LTS</li>
 <li>Type d’instance : t3.medium (2 vCPU, 4 Gio de RAM)</li>
 <li>Paire de clés : votre clé <code>.pem</code></li>
 <li>Volume racine : 30 GiB gp3</li>
@@ -62,7 +66,7 @@
 <pre><code class="language-bash">PasswordAuthentication yes
 PubkeyAuthentication yes
 </code></pre>
-<div class="box box-warning"><strong>Ubuntu 24.04 sur AWS :</strong> le fichier <code>/etc/ssh/sshd_config.d/60-cloudimg-settings.conf</code> contient <code>PasswordAuthentication no</code> et prend le dessus sur <code>sshd_config</code>. Mettez-y aussi <code>PasswordAuthentication yes</code>, sinon <code>ssh-copy-id</code> (étape 5) échouera. Une fois les clés copiées, repassez cette valeur à <code>no</code> : un serveur exposé sur Internet ne doit pas accepter les mots de passe.</div>
+<div class="box box-warning"><strong>Images Ubuntu sur AWS :</strong> si le fichier <code>/etc/ssh/sshd_config.d/60-cloudimg-settings.conf</code> existe, il contient <code>PasswordAuthentication no</code> et prend le dessus sur <code>sshd_config</code>. Mettez-y aussi <code>PasswordAuthentication yes</code>, sinon <code>ssh-copy-id</code> (étape 5) échouera. Une fois les clés copiées, repassez cette valeur à <code>no</code> : un serveur exposé sur Internet ne doit pas accepter les mots de passe.</div>
 <p>Puis redémarrez SSH :</p>
 <pre><code class="language-bash">sudo systemctl restart ssh
 </code></pre>
@@ -84,7 +88,7 @@ sudo hostnamectl set-hostname datanode3     # Sur datanode3
 </code></pre>
 <h2 id="etape-2-creation-de-l-utilisateur-hadoop">Étape 2 : Création de l’utilisateur hadoop</h2>
 <p>Sur chaque instance :</p>
-<pre><code class="language-bash">sudo adduser --disabled-password --gecos &quot;&quot; hadoop
+<pre><code class="language-bash">sudo adduser --disabled-password --comment &quot;&quot; hadoop
 sudo usermod -aG sudo hadoop
 sudo passwd hadoop
 su - hadoop
@@ -94,9 +98,9 @@ su - hadoop
 <pre><code class="language-bash">sudo apt update &amp;&amp; sudo apt install openjdk-21-jdk -y
 
 cd ~
-wget https://archive.apache.org/dist/hadoop/common/hadoop-3.4.3/hadoop-3.4.3.tar.gz
-tar -xzf hadoop-3.4.3.tar.gz
-sudo mv hadoop-3.4.3 /opt/hadoop
+wget https://archive.apache.org/dist/hadoop/common/hadoop-3.5.0/hadoop-3.5.0.tar.gz
+tar -xzf hadoop-3.5.0.tar.gz
+sudo mv hadoop-3.5.0 /opt/hadoop
 sudo chown -R hadoop:hadoop /opt/hadoop
 </code></pre>
 <h2 id="etape-4-configuration-de-l-environnement">Étape 4 : Configuration de l’environnement</h2>
@@ -287,10 +291,10 @@ rm -rf src/test src/main/java/sn/isi/bigdata/App.java</code></pre>
 
   &lt;properties&gt;
     &lt;!-- Bytecode Java 11 : s'exécute sans souci sur la JVM 21 du cluster --&gt;
-    &lt;maven.compiler.release&gt;11&lt;/maven.compiler.release&gt;
+    &lt;maven.compiler.release&gt;17&lt;/maven.compiler.release&gt;
     &lt;project.build.sourceEncoding&gt;UTF-8&lt;/project.build.sourceEncoding&gt;
     &lt;!-- Même version que le cluster installé --&gt;
-    &lt;hadoop.version&gt;3.4.3&lt;/hadoop.version&gt;
+    &lt;hadoop.version&gt;3.5.0&lt;/hadoop.version&gt;
   &lt;/properties&gt;
 
   &lt;dependencies&gt;

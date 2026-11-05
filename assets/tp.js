@@ -67,7 +67,7 @@
   var CMDS = ("sudo apt apt-get hdfs hadoop yarn mapred jps java javac which readlink ssh ssh-keygen ssh-copy-id scp " +
     "cat cd ls mkdir chmod chown nano vi export source wget curl tar mv cp rm echo su adduser usermod passwd " +
     "hostnamectl netplan mvn docker python3 pip for do done if then fi exit beeline head tail grep git systemctl " +
-    "unzip start-all.sh stop-all.sh start-dfs.sh stop-dfs.sh start-yarn.sh stop-yarn.sh").split(" ");
+    "unzip pyspark spark-submit sed start-all.sh stop-all.sh start-dfs.sh stop-dfs.sh start-yarn.sh stop-yarn.sh").split(" ");
   var esc = function (t) { return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
   var shLine = function (line) {
     var out = "", rest = line, m;
@@ -81,12 +81,13 @@
       if (ch === "#" && (i === 0 || /\s/.test(rest[i - 1]))) { com = rest.slice(i); rest = rest.slice(0, i); break; }
     }
     var first = true;
-    var re = /(\s+)|('[^']*'|"[^"]*")|(\$\{?[A-Za-z_][A-Za-z0-9_]*\}?)|(&&|\|\||\||>>|>|<<|;|\\$)|([^\s'"$|&;>]+)/g;
+    var re = /(\s+)|('[^']*'|"[^"]*")|(\$\{?[A-Za-z_][A-Za-z0-9_]*\}?)|(&&|\|\||\||>>|>|<<|;|\\$)|([^\s'"$|&;>]+)|([\s\S])/g;
     while ((m = re.exec(rest)) !== null) {
       if (m[1]) { out += m[1]; continue; }
       if (m[2]) { out += '<span class="sh-str">' + esc(m[2]) + "</span>"; first = false; continue; }
       if (m[3]) { out += '<span class="sh-var">' + esc(m[3]) + "</span>"; first = false; continue; }
       if (m[4]) { out += '<span class="sh-op">' + esc(m[4]) + "</span>"; if (m[4] !== ">" && m[4] !== ">>" && m[4] !== "\\") first = true; continue; }
+      if (m[6]) { out += esc(m[6]); continue; }
       var w = m[5];
       if (first && CMDS.indexOf(w) !== -1) { out += '<span class="sh-cmd">' + esc(w) + "</span>"; first = (w === "sudo" || w === "do" || w === "then"); continue; }
       if (/^--?[A-Za-z]/.test(w)) { out += '<span class="sh-flag">' + esc(w) + "</span>"; first = false; continue; }

@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TP6 — Spark sur le cluster du TP2 — ISI M1 IAGE</title>
+  <meta name="description" content="TP6 du module Big Data (ISI, Master 1 IAGE) : Apache Spark 4.2.0 sur le cluster Hadoop de 4 machines virtuelles du TP2 — calcul distribué, localité des données, shuffle réseau et tolérance aux pannes.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/tp.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html"><img src="logo.jpg" alt="Logo ISI"><span>Big Data — TP<small>ISI · Master 1 IAGE · 2026-2027</small></span></a>
+    <nav class="nav" aria-label="Navigation des TP">
+      <a href="index.html">Accueil</a>
+      <a href="tp1.html">TP1</a>
+      <a href="tp2.html">TP2</a>
+      <a href="tp3.html">TP3</a>
+      <a href="tp4.html">TP4</a>
+      <a href="tp5.html">TP5</a>
+      <a href="tp6.html">TP6</a>
+      <a href="tp7.html">TP7</a>
+      <a href="tp8.html">TP8</a>
+    </nav>
+  </div>
+</header>
+<header class="doc-hero">
+  <div class="doc-hero-inner">
+    <div class="logo-tile"><img src="logo.jpg" alt="Logo ISI"></div>
+    <div>
+      <p class="eyebrow">Travaux pratiques n°6 · Big Data &amp; Analyse de données</p>
+      <h1>Spark sur le cluster du TP2 : calculer à plusieurs machines</h1>
+      <p class="lead">Ajouter Spark au cluster de 4 machines virtuelles du TP2, répartir le calcul sur les trois workers, observer la localité des données et le shuffle sur le réseau, puis provoquer une panne et voir Spark s'en remettre.</p>
+      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Spark 4.2.0</span><span class="chip">Hadoop 3.5.0</span><span class="chip">Cluster 4 nœuds</span><span class="chip">VirtualBox</span><span class="chip">Octobre 2026</span></div>
+    </div>
+  </div>
+</header>
+<section class="brief" aria-label="Fiche du TP"><div class="card"><h3>Objectif</h3><p>Exécuter les traitements Spark du TP5 sur trois workers, et observer ce qu'un vrai cluster change : réseau, localité, pannes.</p></div><div class="card"><h3>Lien avec le cours</h3><p>Chapitre 6 — architecture complète de Spark, cohabitation avec Hadoop, résilience par lignage. Chapitre 2 — localité des données.</p></div><div class="card metier"><h3>Enjeu métier (IAGE)</h3><p>Passer à l'échelle sans changer le code, et garantir qu'une machine en panne n'empêche pas le tableau de bord du matin d'être produit.</p></div></section>
+<div class="doc-layout">
+  <nav class="toc card" aria-label="Sommaire"><h2>Sommaire</h2><ol></ol></nav>
+  <main class="doc">
+<h2 id="introduction">Introduction</h2>
+    <p>Au TP5, Spark tournait sur une seule machine : le driver, YARN et les executors se partageaient la même VM. Les notions du chapitre 6
+    (executors répartis, shuffle, localité, résilience) n'y étaient visibles qu'en théorie. Ce TP reprend <strong>le cluster de 4 machines virtuelles
+    du TP2</strong> et y ajoute Spark :</p>
+    <ul>
+      <li>Spark n'est installé que sur le <strong>master</strong>, qui devient le poste d'où l'on soumet les applications (le driver y tourne) ;</li>
+      <li>les <strong>trois workers</strong> ne reçoivent rien de nouveau : YARN y lance les executors dans des conteneurs, et les bibliothèques de Spark arrivent depuis HDFS ;</li>
+      <li>MapReduce (TP2) et Spark se partagent ainsi le même stockage (HDFS) et le même gestionnaire de ressources (YARN).</li>
+    </ul>
+    <div class="box box-info">
+      <strong>Objectif du TP :</strong> installer <strong>Apache Spark</strong> <span class="badge badge-spark">4.2.0</span> sur le master du cluster du TP2
+      (Hadoop <span class="badge badge-hadoop">3.5.0</span>, <span class="badge badge-java">Java 21</span>), exécuter les traitements du TP5 sur
+      <strong>trois executors répartis sur trois machines</strong>, et observer la localité des données, le shuffle sur le réseau et la reprise après une panne.
+    </div>
+    <h3>Architecture du cluster après ce TP</h3>
+    <div class="mermaid-container">
+    <pre class="mermaid">
+%%{init: {"flowchart": {"nodeSpacing": 40, "rankSpacing": 70, "padding": 20, "htmlLabels": true, "curve": "linear"}}}%%
+flowchart TB
+  subgraph masterNode ["master 192.168.56.10"]
+    direction LR
+    NN["NameNode"]
+    RM["ResourceManager"]
+    DRV["Spark : driver<br/>pyspark, spark-submit"]
+  end
+  subgraph w1 ["datanode1 192.168.56.11"]
+    direction LR
+    DN1["DataNode"]
+    NM1["NodeManager<br/>ApplicationMaster + executor 1"]
+  end
+  subgraph w2 ["datanode2 192.168.56.12"]
+    direction LR
+    DN2["DataNode"]
+    NM2["NodeManager<br/>executor 2"]
+  end
+  subgraph w3 ["datanode3 192.168.56.13"]
+    direction LR
+    DN3["DataNode"]
+    NM3["NodeManager<br/>executor 3"]
+  end
+  DRV --&gt;|"1. demande"| RM
+  RM --&gt;|"2. conteneurs"| NM1
+  RM --&gt; NM2
+  RM --&gt; NM3
+  DRV -.-&gt;|"3. tâches"| NM1
+  DRV -.-&gt; NM2
+  DRV -.-&gt; NM3
+    </pre>
+    </div>
+    <p class="archi-legend">
+      <strong>Légende :</strong> le driver reste sur le master (mode <em>client</em>). YARN place l'ApplicationMaster et un executor par worker.
+      Chaque executor lit en priorité les blocs HDFS de son propre nœud (localité), et les executors échangent les données du shuffle par le réseau host-only.
+      Le master n'a pas de NodeManager (fichier <code>workers</code> du TP2) : aucun executor n'y tourne.
+    </p>
+<h2 id="1-prerequis">1. Prérequis</h2>
+    <h3>1.1 Ce que vous devez avoir terminé</h3>
+    <ul>
+      <li>Le <a href="tp2.html">TP2</a> : cluster de 4 VM opérationnel (HDFS avec 3 DataNodes, YARN avec 3 NodeManagers).</li>
+      <li>Le <a href="tp5.html">TP5</a> : vous réutiliserez ses scripts (<code>gen_ventes.py</code>, <code>ca_par_ville.py</code>) et ses notions (DAG, cache, shuffle).</li>
+    </ul>
+    <h3>1.2 Passer les machines virtuelles à 3 Go de mémoire</h3>
+    <p>Avec 2 Go par VM (TP2), un worker ne peut accueillir qu'un seul conteneur Spark, et le master n'a pas assez de mémoire pour le driver.
+    On passe donc chaque VM à <strong>3 Go</strong> :</p>
+    <table>
+      <thead><tr><th>VM</th><th>Mémoire TP2</th><th>Mémoire TP6</th><th>Ce qui y tourne en plus</th></tr></thead>
+      <tbody>
+        <tr><td>hadoop-master</td><td>2 Go</td><td><strong>3 Go</strong></td><td>le driver Spark (JVM + Python)</td></tr>
+        <tr><td>hadoop-datanode1 à 3</td><td>2 Go</td><td><strong>3 Go</strong></td><td>un executor Spark par worker (et l'ApplicationMaster sur l'un d'eux)</td></tr>
+        <tr><td><em>Total</em></td><td>8 Go</td><td><strong>12 Go</strong></td><td>un poste de 16 Go est nécessaire</td></tr>
+      </tbody>
+    </table>
+    <ol>
+      <li>Sur master, arrêtez proprement le cluster : <code>stop-yarn.sh</code> puis <code>stop-dfs.sh</code>.</li>
+      <li>Éteignez les 4 VM (<code>sudo poweroff</code> dans chacune).</li>
+      <li>Dans VirtualBox, pour chaque VM : <strong>Configuration → Système → Carte mère → Mémoire vive</strong> : <code>3072</code> Mo.</li>
+      <li>Redémarrez les 4 VM.</li>
+    </ol>
+    <h3>1.3 Vérifier la résolution des noms</h3>
+    <p>Sur un vrai cluster, le driver (sur master) et les executors (sur les workers) doivent se joindre par leurs adresses <strong>host-only</strong>.
+    Sur <strong>chacune des 4 VM</strong>, vérifiez :</p>
+<pre>getent hosts master datanode1 datanode2 datanode3
+grep -n "127.0.1.1" /etc/hosts
+</pre>
+    <p>La première commande doit afficher les quatre adresses <code>192.168.56.10</code> à <code>.13</code>. La seconde ne doit afficher
+    <strong>aucune</strong> ligne contenant le nom de la machine (par exemple <code>127.0.1.1 master</code>) : Ubuntu en ajoute une à l'installation.
+    Si elle existe, supprimez-la :</p>
+<pre>sudo sed -i '/^127\.0\.1\.1/d' /etc/hosts
+</pre>
+    <div class="box box-warning">
+      <strong>Pourquoi c'est important :</strong> si <code>master</code> se résout en <code>127.0.1.1</code>, le driver s'annonce avec cette adresse de bouclage.
+      Les executors, sur les workers, essaient alors de s'y connecter… et tombent sur eux-mêmes. L'application reste bloquée sur
+      <em>« Initial job has not accepted any resources »</em>.
+    </div>
+<h2 id="2-remettre-le-cluster-a-niveau">2. Remettre le cluster à niveau</h2>
+    <p>Quatre réglages, repris de l'expérience du TP5, sont à ajouter à la configuration du TP2. Les fichiers sont modifiés sur <strong>master</strong>,
+    puis copiés vers les workers (section 2.5).</p>
+    <h3>2.1 Des dossiers de travail sur le disque (sur les 4 VM)</h3>
+    <p>Sur Ubuntu Server 26.04, <code>/tmp</code> est en mémoire vive (<em>tmpfs</em>) : il est petit, vidé à chaque redémarrage, et le TP2 y place les journaux
+    de Hadoop. Or YARN y recopie aussi les bibliothèques de chaque application Spark (plusieurs centaines de Mo) : il serait vite saturé
+    (<em>« Disk quota exceeded »</em>). On crée donc deux dossiers sur le disque, <strong>sur chacune des 4 VM</strong> :</p>
+<pre>sudo mkdir -p /hadoop/tmp /hadoop/logs
+sudo chown -R hadoop:hadoop /hadoop
+df -h /tmp /hadoop
+</pre>
+    <h3>2.2 hadoop-env.sh : les journaux sur le disque</h3>
+    <p>Sur master, dans <code>$HADOOP_HOME/etc/hadoop</code> :</p>
+<pre>cd $HADOOP_HOME/etc/hadoop
+sed -i 's#^export HADOOP_LOG_DIR=.*#export HADOOP_LOG_DIR=/hadoop/logs#' hadoop-env.sh
+grep HADOOP_LOG_DIR hadoop-env.sh
+</pre>
+    <h3>2.3 core-site.xml : le dossier de travail de Hadoop</h3>
+    <p>Ajoutez dans <code>core-site.xml</code>, à l'intérieur de <code>&lt;configuration&gt;</code> :</p>
+<pre class="xml">  &lt;property&gt;
+    &lt;name&gt;hadoop.tmp.dir&lt;/name&gt;
+    &lt;value&gt;/hadoop/tmp&lt;/value&gt;
+  &lt;/property&gt;
+</pre>
+    <h3>2.4 yarn-site.xml : mémoire et réglages pour Spark</h3>
+    <p>Dans <code>yarn-site.xml</code>, passez les deux valeurs de mémoire du TP2 de <code>1536</code> à <code>2560</code> :</p>
+<pre>sed -i 's#&lt;value&gt;1536&lt;/value&gt;#&lt;value&gt;2560&lt;/value&gt;#' yarn-site.xml
+grep -B1 "2560" yarn-site.xml
+</pre>
+    <p>Puis ajoutez ces quatre propriétés, à l'intérieur de <code>&lt;configuration&gt;</code> :</p>
+<pre class="xml">  &lt;property&gt;
+    &lt;name&gt;yarn.scheduler.minimum-allocation-mb&lt;/name&gt;
+    &lt;value&gt;512&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;name&gt;yarn.nodemanager.vmem-check-enabled&lt;/name&gt;
+    &lt;value&gt;false&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;name&gt;yarn.log-aggregation-enable&lt;/name&gt;
+    &lt;value&gt;true&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;name&gt;yarn.nodemanager.bind-host&lt;/name&gt;
+    &lt;value&gt;0.0.0.0&lt;/value&gt;
+  &lt;/property&gt;
+</pre>
+    <div class="box box-info">
+      <strong>Le calcul de la mémoire (à comprendre) :</strong> chaque worker offre désormais 2 560 Mo à YARN. Un conteneur reçoit la mémoire demandée
+      + une marge de 384 Mo, arrondie au multiple de <code>minimum-allocation-mb</code> (512 Mo) supérieur :
+      <ul>
+        <li>executor : 1 024 + 384 = 1 408 Mo → <strong>1 536 Mo</strong> ;</li>
+        <li>ApplicationMaster : 512 + 384 = 896 Mo → <strong>1 024 Mo</strong> ;</li>
+        <li>le worker qui reçoit l'ApplicationMaster : 1 536 + 1 024 = <strong>2 560 Mo</strong>, pile la capacité ; les deux autres : un executor chacun.</li>
+      </ul>
+      Résultat : <strong>3 executors, un par worker</strong>. Avec l'arrondi par défaut à 1 024 Mo, l'executor occuperait 2 048 Mo et le worker de
+      l'ApplicationMaster ne pourrait plus en accueillir : on n'aurait que 2 executors.
+    </div>
+    <ul>
+      <li><code>vmem-check-enabled = false</code> et <code>log-aggregation-enable = true</code> : mêmes raisons qu'au TP5 (section 5.1).</li>
+      <li><code>nodemanager.bind-host = 0.0.0.0</code> : les pages des NodeManagers (journaux des conteneurs) restent joignables depuis votre poste.</li>
+    </ul>
+    <h3>2.5 Copier la configuration et redémarrer</h3>
+    <p>Sur master, avec la boucle du TP2 (section 7.7) :</p>
+<pre>cd $HADOOP_HOME/etc/hadoop
+for host in datanode1 datanode2 datanode3; do
+  scp hadoop-env.sh core-site.xml yarn-site.xml hadoop@$host:$HADOOP_CONF_DIR/
+done
+
+start-dfs.sh
+start-yarn.sh
+hdfs dfsadmin -report | grep "Live datanodes"
+yarn node -list
+</pre>
+    <p>Vous devez lire <strong>Live datanodes (3)</strong> et trois NodeManagers à l'état <code>RUNNING</code>. Sur
+    <a href="http://192.168.56.10:8088/cluster/nodes">http://192.168.56.10:8088/cluster/nodes</a>, chaque nœud affiche <strong>2.5 GB</strong> de mémoire disponible.</p>
+    <div class="box box-info">
+      Les données HDFS ne bougent pas : leurs dossiers (<code>/hadoop/dfs</code>) sont fixés séparément dans <code>hdfs-site.xml</code> depuis le TP2.
+      Aucun nouveau formatage du NameNode n'est nécessaire.
+    </div>
+<h2 id="3-installer-spark-sur-le-master">3. Installer Spark sur le master</h2>
+    <p>Toute cette section se fait sur <strong>master</strong>, avec l'utilisateur <code>hadoop</code>. Rien n'est installé sur les workers.</p>
+    <h3>3.1 Téléchargement</h3>
+<pre>cd ~
+wget https://archive.apache.org/dist/spark/spark-4.2.0/spark-4.2.0-bin-hadoop3.tgz
+tar -xzf spark-4.2.0-bin-hadoop3.tgz
+sudo mv spark-4.2.0-bin-hadoop3 /opt/spark
+sudo chown -R hadoop:hadoop /opt/spark
+rm spark-4.2.0-bin-hadoop3.tgz
+</pre>
+    <h3>3.2 Variables d'environnement</h3>
+    <p>Ajoutez à la fin de <code>~/.bashrc</code> (<code>HADOOP_HOME</code> et <code>HADOOP_CONF_DIR</code> y sont déjà depuis le TP2) :</p>
+<pre># ---- Spark Environment Variables ----
+export SPARK_HOME=/opt/spark
+export PATH=$PATH:$SPARK_HOME/bin
+export YARN_CONF_DIR=$HADOOP_HOME/etc/hadoop
+export PYSPARK_PYTHON=python3
+</pre>
+<pre>source ~/.bashrc
+spark-submit --version
+</pre>
+    <h3>3.3 spark-env.sh : l'adresse du driver et l'environnement</h3>
+<pre>mkdir -p ~/tmp
+cd $SPARK_HOME/conf
+cp spark-env.sh.template spark-env.sh
+cat &gt;&gt; spark-env.sh &lt;&lt; 'EOF'
+export SPARK_LOCAL_IP=192.168.56.10
+export HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop
+export YARN_CONF_DIR=/opt/hadoop/etc/hadoop
+export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
+export SPARK_LOCAL_DIRS=/home/hadoop/tmp
+export SPARK_SUBMIT_OPTS="-Djava.io.tmpdir=/home/hadoop/tmp"
+EOF
+cp log4j2.properties.template log4j2.properties
+sed -i 's/^rootLogger.level = info/rootLogger.level = warn/' log4j2.properties
+</pre>
+    <div class="box box-warning">
+      <strong>Pourquoi <code>SPARK_LOCAL_IP</code> ?</strong> Chaque VM a deux cartes réseau, et la carte NAT porte <strong>la même adresse
+      (<code>10.0.2.15</code>) sur les quatre VM</strong>. Si le driver s'annonçait avec cette adresse, chaque executor se connecterait… à sa propre machine.
+      On impose donc l'adresse host-only du master. Les autres lignes reprennent les leçons du TP5 : variables lues par Spark quel que soit le programme
+      qui le lance (terminal, PyCharm, notebook), et fichiers temporaires hors de <code>/tmp</code>.
+    </div>
+    <h3>3.4 spark-defaults.conf</h3>
+<pre>cp spark-defaults.conf.template spark-defaults.conf
+nano spark-defaults.conf
+</pre>
+    <p>Ajoutez à la fin :</p>
+<pre class="plain">spark.master                     yarn
+spark.submit.deployMode          client
+spark.driver.memory              512m
+spark.executor.instances         3
+spark.executor.cores             1
+spark.executor.memory            1g
+spark.yarn.am.memory             512m
+spark.eventLog.enabled           true
+spark.eventLog.dir               hdfs://master:8020/spark-logs
+spark.history.fs.logDirectory    hdfs://master:8020/spark-logs
+spark.yarn.historyServer.address master:18080</pre>
+    <h3>3.5 Préparer HDFS : historique et bibliothèques</h3>
+    <p>Comme au TP5 (section 5.4), on dépose une seule fois les bibliothèques de Spark dans HDFS : sur un cluster, elles seraient sinon recopiées vers
+    les trois workers à <strong>chaque</strong> application. Procédez étape par étape et vérifiez chaque résultat :</p>
+<pre>hdfs dfs -mkdir -p /spark-logs /spark-jars
+
+cd ~
+python3 -m zipfile -c spark-libs.zip $SPARK_HOME/jars/*.jar
+ls -lh spark-libs.zip
+hdfs dfs -put -f spark-libs.zip /spark-jars/
+hdfs dfs -ls -h /spark-jars
+</pre>
+    <p>Seulement si l'archive apparaît dans HDFS avec la bonne taille :</p>
+<pre>rm ~/spark-libs.zip
+echo "spark.yarn.archive               hdfs://master:8020/spark-jars/spark-libs.zip" &gt;&gt; $SPARK_HOME/conf/spark-defaults.conf
+</pre>
+    <div class="box box-info">
+      Avec <code>dfs.replication = 3</code>, l'archive est présente sur les trois workers : chaque NodeManager la récupère localement, une fois,
+      et la garde en cache pour les applications suivantes.
+    </div>
+<h2 id="4-valider-spark-sur-le-cluster">4. Valider Spark sur le cluster</h2>
+    <h3>4.1 L'exemple Pi</h3>
+<pre>spark-submit $SPARK_HOME/examples/src/main/python/pi.py 30
+</pre>
+    <p>Vous devez lire <code>Pi is roughly 3.14…</code>. Sur <a href="http://192.168.56.10:8088">http://192.168.56.10:8088</a>, l'application
+    <code>PythonPi</code> apparaît avec le type <strong>SPARK</strong>, à côté des jobs MapReduce du TP2.</p>
+    <h3>4.2 Qui tourne où ?</h3>
+    <p>Ouvrez un shell sur le master et laissez-le ouvert :</p>
+<pre>pyspark
+</pre>
+    <p>Ouvrez ensuite <a href="http://192.168.56.10:4040/executors/">http://192.168.56.10:4040/executors/</a> depuis le navigateur de votre poste :
+    le réseau host-only est directement joignable, aucun tunnel n'est nécessaire. Dans un autre terminal, lancez <code>jps</code> sur
+    <strong>chacune des 4 VM</strong> (<code>ssh datanode1 jps</code> depuis master, par exemple).</p>
+    <table>
+      <thead><tr><th>Machine</th><th>Processus Spark vus par <code>jps</code></th><th>Rôle (chapitre 6)</th></tr></thead>
+      <tbody>
+        <tr><td>master</td><td>SparkSubmit</td><td>?</td></tr>
+        <tr><td>un des workers</td><td>ExecutorLauncher + YarnCoarseGrainedExecutorBackend</td><td>?</td></tr>
+        <tr><td>les deux autres workers</td><td>YarnCoarseGrainedExecutorBackend</td><td>?</td></tr>
+      </tbody>
+    </table>
+    <div class="box box-metier">
+      <strong>Question 1 :</strong> complétez la colonne « Rôle ». Dans l'onglet <em>Executors</em>, relevez la machine (<em>Address</em>) de chaque executor
+      et sa mémoire de stockage. Pourquoi aucun executor ne tourne-t-il sur master ? Pourquoi l'ApplicationMaster et un executor partagent-ils un même worker ?
+    </div>
+    <p>Gardez ce shell ouvert pour la section 5.</p>
+<h2 id="5-le-fil-rouge-distribue">5. Le fil rouge, distribué</h2>
+    <h3>5.1 Des données réparties sur les trois workers</h3>
+    <p>Sur master, recréez <code>purchases.txt</code> et <code>gen_ventes.py</code> du <a href="tp5.html">TP5</a> (section 7.1), puis générez
+    <strong>6 millions</strong> de ventes, soit environ 300 Mo et 3 blocs HDFS :</p>
+<pre>cd ~
+python3 gen_ventes.py 6000000
+ls -lh purchases_big.txt
+hdfs dfs -mkdir -p /input
+hdfs dfs -put -f purchases.txt purchases_big.txt /input/
+hdfs fsck /input/purchases_big.txt -files -blocks -locations
+</pre>
+    <p>La dernière commande liste chaque bloc et les trois DataNodes qui en détiennent une copie (réplication ×3 du TP2).</p>
+    <h3>5.2 Le chiffre d'affaires par ville, sur trois machines</h3>
+    <p>Dans le shell <code>pyspark</code> resté ouvert :</p>
+<pre class="python"><span class="py-kw">import</span> time
+big = sc.textFile(<span class="py-str">"hdfs:///input/purchases_big.txt"</span>)
+big.getNumPartitions()                                   <span class="py-com"># une partition par bloc</span>
+paires = big.map(<span class="py-kw">lambda</span> l: l.split(<span class="py-str">"\t"</span>)).map(<span class="py-kw">lambda</span> c: (c[2], float(c[4])))
+ca = paires.reduceByKey(<span class="py-kw">lambda</span> a, b: a + b)
+
+t = time.time()
+print(ca.takeOrdered(5, key=<span class="py-kw">lambda</span> t: -t[1]), round(time.time() - t, 1), <span class="py-str">"s"</span>)</pre>
+    <p>Dans l'onglet <strong>Stages</strong> de l'interface, ouvrez le premier stage du job et regardez le tableau des tâches :
+    colonnes <em>Executor ID / Host</em> et <em>Locality Level</em>.</p>
+    <div class="box box-metier">
+      <strong>Question 2 :</strong> combien de tâches compte le premier stage, et comment se répartissent-elles entre les trois workers ?
+      Quel niveau de localité observez-vous ? Expliquez-le à l'aide de la réplication ×3 du TP2. Comparez le temps obtenu avec celui du TP5
+      (une seule VM) : qu'est-ce qui accélère, qu'est-ce qui ralentit ?
+    </div>
+    <h3>5.3 Rendre la localité visible</h3>
+    <p>Avec trois copies de chaque bloc sur trois workers, toutes les lectures sont locales. Déposons le même fichier avec <strong>une seule copie</strong> :</p>
+<pre>hdfs dfs -D dfs.replication=1 -put -f ~/purchases_big.txt /input/purchases_r1.txt
+hdfs fsck /input/purchases_r1.txt -files -blocks -locations
+</pre>
+<pre class="python">r1 = sc.textFile(<span class="py-str">"hdfs:///input/purchases_r1.txt"</span>)
+r1.map(<span class="py-kw">lambda</span> l: l.split(<span class="py-str">"\t"</span>)).map(<span class="py-kw">lambda</span> c: (c[2], float(c[4]))) \
+  .reduceByKey(<span class="py-kw">lambda</span> a, b: a + b).count()</pre>
+    <div class="box box-metier">
+      <strong>Question 3 :</strong> d'après <code>fsck</code>, sur quel nœud se trouve chaque bloc de <code>purchases_r1.txt</code> ?
+      Dans l'onglet Stages, chaque tâche a-t-elle tourné sur le nœud qui détient son bloc ? Relevez les niveaux de localité
+      (<code>NODE_LOCAL</code>, <code>RACK_LOCAL</code>, <code>ANY</code>) et expliquez ce que coûte une lecture non locale.
+    </div>
+    <h3>5.4 Le shuffle traverse maintenant le réseau</h3>
+<pre class="python">r_reduce = paires.reduceByKey(<span class="py-kw">lambda</span> a, b: a + b).collect()
+r_group = paires.groupByKey().mapValues(sum).collect()</pre>
+    <p>Dans l'onglet Stages, comparez pour les deux jobs les colonnes <strong>Shuffle Write</strong> et <strong>Shuffle Read</strong> (dans le détail d'un stage :
+    <em>Remote Bytes Read</em>, les octets venus d'un autre worker).</p>
+    <div class="box box-metier">
+      <strong>Question 4 :</strong> relevez les volumes de shuffle des deux jobs et la part lue à distance. Pourquoi l'écart entre <code>reduceByKey</code>
+      et <code>groupByKey</code> compte-t-il davantage sur un cluster que sur la VM unique du TP5 ? Faites le lien avec le combiner du chapitre 4.
+    </div>
+<h2 id="6-experience-une-machine-tombe-en-panne">6. Expérience : une machine tombe en panne</h2>
+    <p>Au chapitre 6, la résilience des RDD reposait sur le <strong>lignage</strong> : une partition perdue est recalculée à partir de sa recette.
+    On le vérifie en arrêtant un worker en plein travail.</p>
+    <h3>6.1 Remplir le cache sur les trois executors</h3>
+<pre class="python">paires.cache()
+paires.count()        <span class="py-com"># lit HDFS et remplit le cache sur les trois executors</span></pre>
+    <p>Dans l'onglet <strong>Storage</strong>, notez le nombre de partitions en cache (<em>Cached Partitions</em>) et, dans le détail, leur répartition par executor.</p>
+    <h3>6.2 Arrêter un worker</h3>
+    <p>Dans un second terminal, sur <strong>datanode2</strong>, arrêtez son NodeManager : YARN tue aussitôt les conteneurs de ce nœud, dont un executor.</p>
+<pre>ssh datanode2
+yarn --daemon stop nodemanager
+exit
+</pre>
+    <h3>6.3 Relancer le calcul</h3>
+    <p>Revenez au shell <code>pyspark</code> et relancez le chiffre d'affaires :</p>
+<pre class="python">t = time.time()
+print(paires.reduceByKey(<span class="py-kw">lambda</span> a, b: a + b).takeOrdered(5, key=<span class="py-kw">lambda</span> t: -t[1]),
+      round(time.time() - t, 1), <span class="py-str">"s"</span>)</pre>
+    <p>Observez l'onglet <em>Executors</em> (un executor marqué <em>Dead</em>), l'onglet <em>Storage</em> (partitions en cache) et le détail du dernier
+    stage (tâches qui ne lisent plus depuis le cache).</p>
+    <div class="box box-metier">
+      <strong>Question 5 :</strong> le résultat est-il identique à celui de la section 5.2 ? Combien de partitions en cache restait-il après la panne,
+      et comment Spark a-t-il obtenu les autres ? Pourquoi le nombre d'executors ne remonte-t-il pas à trois (aidez-vous du calcul de mémoire de la section 2.4) ?
+      Comparez cette résilience par <strong>recalcul</strong> à la résilience par <strong>réplication</strong> de HDFS : que coûte chacune ?
+    </div>
+    <h3>6.4 Remettre le worker en service</h3>
+<pre>ssh datanode2
+yarn --daemon start nodemanager
+exit
+yarn node -list
+</pre>
+    <p>Le DataNode de datanode2 n'a jamais été arrêté : HDFS est resté complet. <em>Pour aller plus loin :</em> arrêtez aussi le DataNode
+    (<code>hdfs --daemon stop datanode</code>) sur <code>purchases_r1.txt</code> (une seule copie) et expliquez ce qui se passe.</p>
+    <p>Quittez le shell (<code>exit()</code>) : le cache et les executors sont libérés.</p>
+<h2 id="7-une-application-en-mode-cluster">7. Une application en mode cluster</h2>
+    <p>Recréez sur master le script <code>ca_par_ville.py</code> du <a href="tp5.html">TP5</a> (section 9), puis soumettez-le en mode <em>cluster</em> :</p>
+<pre>hdfs dfs -rm -r -f /output-spark-ca
+spark-submit --deploy-mode cluster ~/ca_par_ville.py \
+    hdfs:///input/purchases_big.txt hdfs:///output-spark-ca
+</pre>
+    <p>Pendant l'exécution, cherchez avec <code>jps</code> sur les workers le processus <strong>ApplicationMaster</strong> : c'est lui qui contient
+    désormais le driver. À la fin, lisez la sortie du driver :</p>
+<pre>yarn logs -applicationId application_XXXXXXXXXXXXX_XXXX -log_files stdout
+hdfs dfs -cat /output-spark-ca/part-* | head -5
+</pre>
+    <div class="box box-metier">
+      <strong>Question 6 :</strong> sur quel worker le driver a-t-il tourné ? Que se passerait-il, en mode client puis en mode cluster, si vous fermiez
+      le terminal du master pendant l'exécution ? Pour un traitement planifié chaque nuit (le tableau de bord du lendemain), lequel choisir et pourquoi ?
+    </div>
+<h2 id="8-l-historique-des-applications">8. L'historique des applications</h2>
+<pre>$SPARK_HOME/sbin/start-history-server.sh
+</pre>
+    <p>Ouvrez <a href="http://192.168.56.10:18080">http://192.168.56.10:18080</a> : retrouvez l'application de la section 6 et la trace de l'executor perdu.
+    En fin de séance :</p>
+<pre>$SPARK_HOME/sbin/stop-history-server.sh
+stop-yarn.sh
+stop-dfs.sh
+</pre>
+    <div class="box box-warning">
+      N'utilisez pas <code>$SPARK_HOME/sbin/start-all.sh</code> : ce script lance un cluster Spark <em>Standalone</em>, que nous n'utilisons pas.
+      Pour Hadoop, gardez <code>start-dfs.sh</code> et <code>start-yarn.sh</code> comme au TP2.
+    </div>
+<h2 id="9-developper-depuis-pycharm-optionnel">9. Développer depuis PyCharm (optionnel)</h2>
+    <p>La démarche de la section 8 du <a href="tp5.html">TP5</a> s'applique à l'identique, avec deux simplifications :</p>
+    <ul>
+      <li>l'hôte de l'interpréteur SSH est directement <code>192.168.56.10</code>, port 22 : le réseau host-only est joignable depuis votre poste ;</li>
+      <li>les variables d'environnement sont déjà dans <code>spark-env.sh</code> (section 3.3) : seuls l'environnement virtuel <code>~/venv-tp5</code>
+        et le fichier <code>spark.pth</code> (TP5, section 8.2) sont à recréer sur master.</li>
+    </ul>
+    <p>Le notebook du TP5 s'exécute alors sur le cluster sans modification : trois executors au lieu d'un.</p>
+<h2 id="10-resolution-des-problemes-courants-depannage">10. Résolution des problèmes courants (Dépannage)</h2>
+    <table>
+      <thead><tr><th>Symptôme</th><th>Cause probable</th><th>Solution</th></tr></thead>
+      <tbody>
+        <tr><td>L'application reste sur <em>« Initial job has not accepted any resources »</em></td><td>Les executors ne joignent pas le driver : adresse annoncée en <code>127.0.1.1</code> ou <code>10.0.2.15</code></td><td>Vérifiez <code>SPARK_LOCAL_IP=192.168.56.10</code> (section 3.3) et l'absence de ligne <code>127.0.1.1</code> dans <code>/etc/hosts</code> (section 1.3).</td></tr>
+        <tr><td>Seulement 2 executors au lieu de 3</td><td>Mémoire YARN insuffisante ou arrondi à 1 024 Mo</td><td>Vérifiez <code>memory-mb = 2560</code> et <code>minimum-allocation-mb = 512</code> sur les <strong>4</strong> nœuds (section 2.4), puis redémarrez YARN.</td></tr>
+        <tr><td>L'application reste en état <strong>ACCEPTED</strong></td><td>Une autre application Spark (shell, notebook) occupe les conteneurs</td><td>Fermez-la (<code>exit()</code>, <code>spark.stop()</code>) ou <code>yarn application -kill &lt;id&gt;</code>.</td></tr>
+        <tr><td><em>« Disk quota exceeded »</em> ou <em>« No space left on device »</em></td><td>Fichiers temporaires dans <code>/tmp</code> (tmpfs)</td><td>Sections 2.1 à 2.3 sur les 4 nœuds et section 3.3 sur master ; nettoyez <code>/tmp/spark-*</code> et <code>/tmp/hadoop-hadoop</code>.</td></tr>
+        <tr><td><em>« File does not exist: …/spark-libs.zip »</em></td><td>La ligne <code>spark.yarn.archive</code> a été ajoutée sans que l'archive soit dans HDFS</td><td><code>sed -i '/spark.yarn.archive/d' $SPARK_HOME/conf/spark-defaults.conf</code>, puis refaites la section 3.5 étape par étape.</td></tr>
+        <tr><td>Conteneur tué : <em>« running beyond virtual memory limits »</em></td><td>Contrôle de la mémoire virtuelle</td><td><code>vmem-check-enabled = false</code> sur les 4 nœuds (section 2.4).</td></tr>
+        <tr><td>Erreur Python dans les executors : <em>« Python in worker has different version »</em></td><td>Version de Python différente entre master et un worker</td><td><code>python3 --version</code> sur les 4 VM : toutes doivent être en 3.14 (Ubuntu Server 26.04).</td></tr>
+        <tr><td>Un NodeManager n'apparaît plus dans <code>yarn node -list</code></td><td>Arrêté à la section 6, ou VM éteinte</td><td><code>yarn --daemon start nodemanager</code> sur le worker concerné.</td></tr>
+      </tbody>
+    </table>
+<h2 id="11-livrable-attendu">11. Livrable attendu</h2>
+    <p>Un court rapport (PDF ou Markdown) contenant :</p>
+    <ul>
+      <li>les modifications de configuration (sections 2 et 3) et une capture de l'onglet <em>Executors</em> montrant les trois workers ;</li>
+      <li>les réponses aux <strong>questions 1 à 6</strong>, avec une capture du tableau des tâches (localité) et une de l'expérience de panne ;</li>
+      <li>un tableau comparant les temps du CA par ville : MapReduce (TP2), Spark sur une VM (TP5), Spark sur le cluster (TP6) ;</li>
+      <li>une phrase de <strong>conclusion métier</strong> : en quoi la reprise après panne observée en section 6 protège-t-elle un processus de gestion
+        (par exemple le tableau de bord commercial du matin) ?</li>
+    </ul>
+<h2 id="annexes">Annexes</h2>
+    <h3>Annexe A — Interfaces web</h3>
+    <table>
+      <thead><tr><th>Service</th><th>Adresse depuis votre poste</th></tr></thead>
+      <tbody>
+        <tr><td>Application Spark en cours (driver)</td><td><code>http://192.168.56.10:4040</code></td></tr>
+        <tr><td>Historique Spark</td><td><code>http://192.168.56.10:18080</code></td></tr>
+        <tr><td>YARN ResourceManager</td><td><code>http://192.168.56.10:8088</code></td></tr>
+        <tr><td>HDFS NameNode</td><td><code>http://192.168.56.10:9870</code></td></tr>
+        <tr><td>NodeManager d'un worker</td><td><code>http://192.168.56.11:8042</code> (12, 13)</td></tr>
+      </tbody>
+    </table>
+    <h3>Annexe B — Récapitulatif de la mémoire</h3>
+    <table>
+      <thead><tr><th>Élément</th><th>Demandé</th><th>Conteneur YARN</th><th>Où</th></tr></thead>
+      <tbody>
+        <tr><td>Driver (mode client)</td><td>512 Mo</td><td>hors YARN</td><td>master</td></tr>
+        <tr><td>ApplicationMaster</td><td>512 Mo</td><td>1 024 Mo</td><td>un worker</td></tr>
+        <tr><td>Executor (× 3)</td><td>1 024 Mo</td><td>1 536 Mo</td><td>un par worker</td></tr>
+        <tr><td>Capacité YARN par worker</td><td colspan="2">2 560 Mo</td><td>datanode1 à 3</td></tr>
+      </tbody>
+    </table>
+    <h3>Annexe C — Commandes utiles</h3>
+    <table>
+      <thead><tr><th>Commande</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>yarn node -list</code></td><td>NodeManagers actifs et leur état</td></tr>
+        <tr><td><code>yarn application -list</code></td><td>Applications en cours (Spark et MapReduce)</td></tr>
+        <tr><td><code>yarn --daemon stop|start nodemanager</code></td><td>Arrêter ou relancer le NodeManager d'un worker</td></tr>
+        <tr><td><code>hdfs fsck &lt;fichier&gt; -files -blocks -locations</code></td><td>Blocs d'un fichier et DataNodes qui les détiennent</td></tr>
+        <tr><td><code>hdfs dfs -D dfs.replication=1 -put …</code></td><td>Déposer un fichier avec une seule copie</td></tr>
+        <tr><td><code>ssh datanode1 jps</code></td><td>Processus Java d'un worker, depuis master</td></tr>
+      </tbody>
+    </table>
+    <div class="box box-success">
+      <strong>Félicitations !</strong> Votre cluster fait tourner deux moteurs sur trois workers, et vous avez vu Spark survivre à la perte d'une machine :
+      c'est le quotidien d'une plateforme Big Data en entreprise.
+    </div>
+<div class="pager"><a class="prev" href="tp5.html"><small>← Précédent</small>TP5 — Spark sur la VM du TP1</a><a class="next" href="tp7.html"><small>Suivant →</small>TP7 — DataFrames et Spark SQL</a></div>
+  </main>
+</div>
+<footer class="site-footer">ISI — Institut Supérieur d'Informatique · Master 1 — IAGE · Big Data &amp; Analyse de données · Année universitaire 2026-2027</footer>
+<script src="assets/tp.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  if (window.mermaid) {
+    mermaid.initialize({
+      startOnLoad: true, theme: 'dark', securityLevel: 'loose',
+      flowchart: { nodeSpacing: 70, rankSpacing: 100, padding: 30, htmlLabels: true, curve: 'linear' },
+      themeVariables: {
+        fontFamily: '-apple-system, Segoe UI, Roboto, Arial, sans-serif',
+        lineColor: '#f4b183', primaryColor: '#2c4f86', primaryTextColor: '#f1f5f9', primaryBorderColor: '#f4b183',
+        secondaryTextColor: '#e5e7eb', tertiaryTextColor: '#e5e7eb', textColor: '#e5e7eb',
+        mainBkg: '#2c4f86', nodeBorder: '#f4b183', clusterBkg: '#1a2f52', clusterBorder: '#3a5583',
+        titleColor: '#f4b183', edgeLabelBackground: '#13233f'
+      }
+    });
+  }
+</script>
+
+
+</body>
+</html>

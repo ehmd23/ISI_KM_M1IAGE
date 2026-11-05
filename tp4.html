@@ -20,6 +20,10 @@
       <a href="tp2.html">TP2</a>
       <a href="tp3.html">TP3</a>
       <a href="tp4.html">TP4</a>
+      <a href="tp5.html">TP5</a>
+      <a href="tp6.html">TP6</a>
+      <a href="tp7.html">TP7</a>
+      <a href="tp8.html">TP8</a>
     </nav>
   </div>
 </header>
@@ -58,21 +62,27 @@
     </ul>
 
     <h3>2.2 Installation de Docker sur Ubuntu</h3>
-    <p>Sur une machine ou une VM <strong>Ubuntu</strong>, installez <strong>Docker</strong> depuis le dépôt officiel de Docker :</p>
+    <p>Sur une machine ou une VM <strong>Ubuntu</strong> (Ubuntu Server 26.04 LTS, comme les autres TP), installez <strong>Docker</strong> depuis le dépôt officiel de Docker :</p>
 
 <pre><code class="language-bash">sudo apt update
-sudo apt install -y ca-certificates curl gnupg lsb-release
+sudo apt install -y ca-certificates curl
 
-sudo mkdir -p /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-sudo chmod a+r /etc/apt/keyrings/docker.gpg
+# Clé du dépôt Docker
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
 
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
-| sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+# Déclaration du dépôt (format deb822)
+sudo tee /etc/apt/sources.list.d/docker.sources &lt;&lt;EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release &amp;&amp; echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
 
 sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin</code></pre>
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin</code></pre>
 
     <p>Puis ajoutez votre utilisateur au groupe <code>docker</code> :</p>
 
@@ -126,7 +136,7 @@ flowchart LR
       </pre>
     </div>
 
-    <div class="box box-info"><strong>Versions :</strong> les conteneurs Hadoop de cette stack (images <code>bde2020</code>) embarquent <strong>Hadoop 3.2.1 sur Java 8</strong>, et non la version 3.4.3 installée dans les TP1 à TP3. Les commandes HDFS utilisées ici sont identiques ; seuls les numéros de version affichés diffèrent. Le port RPC du NameNode est aussi différent : <code>9000</code> ici, <code>8020</code> dans les TP précédents.</div>
+    <div class="box box-info"><strong>Versions :</strong> les conteneurs Hadoop de cette stack (images <code>bde2020</code>) embarquent <strong>Hadoop 3.2.1 sur Java 8</strong>, et non la version 3.5.0 installée dans les TP1 à TP3. Les commandes HDFS utilisées ici sont identiques ; seuls les numéros de version affichés diffèrent. Le port RPC du NameNode est aussi différent : <code>9000</code> ici, <code>8020</code> dans les TP précédents.</div>
 
     <p><strong>Ports utiles (hôte)</strong> — à adapter si vous modifiez le fichier Compose :</p>
 
@@ -606,7 +616,7 @@ docker logs hive-server2 --tail=80</code></pre>
     <ul>
       <li>Documentation Apache : <a href="https://cwiki.apache.org/confluence/display/Hive/Setting+Up+Hive+with+Docker" target="_blank" rel="noopener">Setting Up Hive with Docker</a> (informations générales sur l'image <code>apache/hive</code>).</li>
     </ul>
-<div class="pager"><a class="prev" href="tp3.html"><small>← Précédent</small>TP3 — Cluster sur AWS EC2</a><span></span></div>
+<div class="pager"><a class="prev" href="tp3.html"><small>← Précédent</small>TP3 — Cluster sur AWS EC2</a><a class="next" href="tp5.html"><small>Suivant →</small>TP5 — Spark sur la VM du TP1</a></div>
   </main>
 </div>
 <footer class="site-footer">ISI — Institut Supérieur d'Informatique · Master 1 — IAGE · Big Data &amp; Analyse de données · Année universitaire 2026-2027</footer>
