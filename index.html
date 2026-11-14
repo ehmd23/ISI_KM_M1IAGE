@@ -56,6 +56,7 @@
       <a href="tp6.html">TP6</a>
       <a href="tp7.html">TP7</a>
       <a href="tp8.html">TP8</a>
+      <a href="tp9.html">TP9</a>
     </nav>
   </div>
 </header>
@@ -66,7 +67,7 @@
     <div>
       <p class="eyebrow">Module Big Data &amp; Analyse de données</p>
       <h1>Travaux pratiques Hadoop, Hive et Spark</h1>
-      <p class="lead">Huit TP progressifs : installer Hadoop sur un poste, monter un cluster, le transposer dans le cloud, interroger les données en SQL, calculer en mémoire avec Spark sur une machine puis sur le cluster, passer aux DataFrames, et finir sur une plateforme managée (Databricks). Fil rouge : les ventes d'une enseigne, analysées par ville, catégorie et moyen de paiement.</p>
+      <p class="lead">Neuf TP progressifs : installer Hadoop sur un poste, monter un cluster, le transposer dans le cloud, interroger les données en SQL, calculer en mémoire avec Spark, nettoyer et analyser des données réelles avec les RDD, passer sur le cluster, passer aux DataFrames, et finir sur une plateforme managée (Databricks). Fil rouge : les ventes d'une enseigne, analysées par ville, catégorie et moyen de paiement.</p>
       <div class="chips">
         <span class="chip"><b>Master 1 — IAGE</b></span>
         <span class="chip">Informatique Appliquée à la Gestion des Entreprises</span>
@@ -157,6 +158,20 @@
 
     <article class="card tp-card">
       <div class="tp-num">6</div>
+      <h3>Nettoyer et analyser les ventes de Teranga Distrib avec les RDD</h3>
+      <p>Un export de caisses d'un million de lignes plein d'anomalies : le fiabiliser, maîtriser le cache, puis produire les indicateurs du comité de direction.</p>
+      <div class="tp-q"><b>Question métier</b>Peut-on présenter au comité de direction des chiffres calculés sur des données de caisse non fiabilisées ?</div>
+      <ul>
+        <li>Règles de nettoyage, rejets tracés, doublons</li>
+        <li><code>cache</code>, <code>persist</code> et <code>unpersist</code>, mesurés dans l'interface 4040</li>
+        <li>Une trentaine d'analyses enregistrées avec <code>saveAsTextFile</code></li>
+      </ul>
+      <div class="tags"><span class="tag">RDD</span><span class="tag">Nettoyage</span><span class="tag">Cache</span></div>
+      <a class="btn" href="tp6.html">Ouvrir le TP6 →</a>
+    </article>
+
+    <article class="card tp-card">
+      <div class="tp-num">7</div>
       <h3>Spark sur le cluster du TP2 : calculer à plusieurs machines</h3>
       <p>Spark sur les 4 VM du TP2 : trois executors répartis, localité des données, shuffle réseau et reprise après panne.</p>
       <div class="tp-q"><b>Question métier</b>Le tableau de bord du matin est-il produit même si une machine tombe en panne ?</div>
@@ -166,11 +181,11 @@
         <li>Panne d'un worker et recalcul par lignage</li>
       </ul>
       <div class="tags"><span class="tag">Spark 4.2.0</span><span class="tag">Cluster 4 nœuds</span><span class="tag">YARN</span></div>
-      <a class="btn" href="tp6.html">Ouvrir le TP6 →</a>
+      <a class="btn" href="tp7.html">Ouvrir le TP7 →</a>
     </article>
 
     <article class="card tp-card">
-      <div class="tp-num">7</div>
+      <div class="tp-num">8</div>
       <h3>DataFrames et Spark SQL : refaire le TP5, et comparer</h3>
       <p>Le fil rouge du TP5 réécrit en DataFrame et en SQL, les plans de Catalyst, Parquet, jointures et fenêtres.</p>
       <div class="tp-q"><b>Question métier</b>Un analyste qui connaît le SQL peut-il exploiter Spark aussi bien qu'un développeur ?</div>
@@ -180,12 +195,12 @@
         <li>Parquet partitionné et comparaison avec les RDD</li>
       </ul>
       <div class="tags"><span class="tag">Spark SQL</span><span class="tag">DataFrame</span><span class="tag">Parquet</span></div>
-      <a class="btn" href="tp7.html">Ouvrir le TP7 →</a>
+      <a class="btn" href="tp8.html">Ouvrir le TP8 →</a>
     </article>
 
     <article class="card tp-card">
-      <div class="tp-num">8</div>
-      <h3>Le TP7 sur Databricks : Spark sans installation</h3>
+      <div class="tp-num">9</div>
+      <h3>Le TP8 sur Databricks : Spark sans installation</h3>
       <p>Databricks Free Edition : Unity Catalog, notebook serverless, Delta Lake, tableau de bord et job planifié.</p>
       <div class="tp-q"><b>Question métier</b>Faut-il construire sa plateforme Big Data, ou l'acheter en service ?</div>
       <ul>
@@ -194,7 +209,7 @@
         <li>Tableau de bord et traitement nocturne</li>
       </ul>
       <div class="tags"><span class="tag">Databricks</span><span class="tag">Delta Lake</span><span class="tag">Serverless</span></div>
-      <a class="btn" href="tp8.html">Ouvrir le TP8 →</a>
+      <a class="btn" href="tp9.html">Ouvrir le TP9 →</a>
     </article>
   </div>
 
@@ -209,9 +224,10 @@
         <li><strong>TP3 :</strong> un compte AWS. Les instances sont facturées à l'heure : arrêtez-les après chaque séance.</li>
         <li><strong>TP4 :</strong> Docker Engine et Docker Compose V2, 8 Go de RAM disponibles pour Docker.</li>
         <li><strong>TP5 :</strong> la VM du TP1 (8 Go de RAM recommandés) et 5 Go d'espace disque libre.</li>
-        <li><strong>TP6 :</strong> les 4 VM du TP2, passées à <strong>3 Go</strong> chacune (poste de 16 Go de RAM).</li>
-        <li><strong>TP7 :</strong> la VM du TP5 (Spark 4.2.0 sur YARN) et les données du TP5 dans HDFS.</li>
-        <li><strong>TP8 :</strong> un navigateur web et un compte Databricks Free Edition (gratuit, sans carte bancaire).</li>
+        <li><strong>TP6 :</strong> la VM du TP5 et 1 Go d'espace disque libre (données téléchargeables depuis la page du TP).</li>
+        <li><strong>TP7 :</strong> les 4 VM du TP2, passées à <strong>3 Go</strong> chacune (poste de 16 Go de RAM).</li>
+        <li><strong>TP8 :</strong> la VM du TP5 (Spark 4.2.0 sur YARN) et les données du TP5 dans HDFS.</li>
+        <li><strong>TP9 :</strong> un navigateur web et un compte Databricks Free Edition (gratuit, sans carte bancaire).</li>
       </ul>
     </div>
     <div class="card">
@@ -224,9 +240,10 @@
           <tr><td>TP3</td><td>Ch. 1 et 3 — Coûts, sur site ou cloud</td></tr>
           <tr><td>TP4</td><td>Ch. 5 — Hive et Hue</td></tr>
           <tr><td>TP5</td><td>Ch. 6 — Spark : RDD, DAG, cache</td></tr>
-          <tr><td>TP6</td><td>Ch. 6 — Spark sur cluster : localité, shuffle, résilience</td></tr>
-          <tr><td>TP7</td><td>Ch. 7 — Spark SQL et DataFrames : Catalyst, Parquet</td></tr>
-          <tr><td>TP8</td><td>Ch. 7 — Databricks, Delta Lake</td></tr>
+          <tr><td>TP6</td><td>Ch. 6 — RDD : nettoyage, cache, persist, analyses</td></tr>
+          <tr><td>TP7</td><td>Ch. 6 — Spark sur cluster : localité, shuffle, résilience</td></tr>
+          <tr><td>TP8</td><td>Ch. 7 — Spark SQL et DataFrames : Catalyst, Parquet</td></tr>
+          <tr><td>TP9</td><td>Ch. 7 — Databricks, Delta Lake</td></tr>
         </tbody>
       </table>
     </div>

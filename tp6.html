@@ -3,12 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TP6 — Spark sur le cluster du TP2 — ISI M1 IAGE</title>
-  <meta name="description" content="TP6 du module Big Data (ISI, Master 1 IAGE) : Apache Spark 4.2.0 sur le cluster Hadoop de 4 machines virtuelles du TP2 — calcul distribué, localité des données, shuffle réseau et tolérance aux pannes.">
+  <title>TP6 : Nettoyer et analyser les ventes avec les RDD · ISI M1 IAGE</title>
+  <meta name="description" content="TP6 du module Big Data (ISI, Master 1 IAGE) : nettoyer un export de caisses plein d'anomalies et produire les indicateurs du comité de direction avec les RDD de Spark : transformations, actions, paires clé/valeur, jointures, cache, persist, unpersist et saveAsTextFile.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/tp.css">
+  <style>
+    .downloads { display: flex; flex-wrap: wrap; gap: 12px; margin: 14px 0 6px; }
+    .dl-btn { display: inline-flex; align-items: center; gap: 10px; padding: 11px 18px; border-radius: 10px;
+      background: var(--navy); color: #fff !important; text-decoration: none !important; font-weight: 600;
+      border: 1px solid var(--navy); transition: background .15s, border-color .15s; }
+    .dl-btn:hover { background: var(--orange); border-color: var(--orange); }
+    .dl-btn small { font-weight: 400; opacity: .85; }
+    .dl-btn svg { width: 18px; height: 18px; flex: none; }
+    .save { font-family: var(--mono); font-size: .85em; color: var(--muted); margin-top: 6px; }
+  </style>
 </head>
 <body>
 <header class="topbar">
@@ -24,6 +34,7 @@
       <a href="tp6.html">TP6</a>
       <a href="tp7.html">TP7</a>
       <a href="tp8.html">TP8</a>
+      <a href="tp9.html">TP9</a>
     </nav>
   </div>
 </header>
@@ -32,475 +43,477 @@
     <div class="logo-tile"><img src="logo.jpg" alt="Logo ISI"></div>
     <div>
       <p class="eyebrow">Travaux pratiques n°6 · Big Data &amp; Analyse de données</p>
-      <h1>Spark sur le cluster du TP2 : calculer à plusieurs machines</h1>
-      <p class="lead">Ajouter Spark au cluster de 4 machines virtuelles du TP2, répartir le calcul sur les trois workers, observer la localité des données et le shuffle sur le réseau, puis provoquer une panne et voir Spark s'en remettre.</p>
-      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Spark 4.2.0</span><span class="chip">Hadoop 3.5.0</span><span class="chip">Cluster 4 nœuds</span><span class="chip">VirtualBox</span><span class="chip">Octobre 2026</span></div>
+      <h1>Nettoyer et analyser les ventes de Teranga Distrib avec les RDD</h1>
+      <p class="lead">Un export de caisses réel, imparfait : le fiabiliser avec Spark, maîtriser le cache, puis produire les indicateurs du comité de direction.</p>
+      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Spark 4.2.0</span><span class="chip">RDD</span><span class="chip">VM du TP5</span><span class="chip">2 séances de 3 h</span><span class="chip">Novembre 2026</span></div>
     </div>
   </div>
 </header>
-<section class="brief" aria-label="Fiche du TP"><div class="card"><h3>Objectif</h3><p>Exécuter les traitements Spark du TP5 sur trois workers, et observer ce qu'un vrai cluster change : réseau, localité, pannes.</p></div><div class="card"><h3>Lien avec le cours</h3><p>Chapitre 6 — architecture complète de Spark, cohabitation avec Hadoop, résilience par lignage. Chapitre 2 — localité des données.</p></div><div class="card metier"><h3>Enjeu métier (IAGE)</h3><p>Passer à l'échelle sans changer le code, et garantir qu'une machine en panne n'empêche pas le tableau de bord du matin d'être produit.</p></div></section>
+<section class="brief" aria-label="Fiche du TP"><div class="card"><h3>Objectif</h3><p>Nettoyer un fichier de plus d'un million de lignes plein d'anomalies, puis répondre à une trentaine de questions d'analyse, uniquement avec des RDD.</p></div><div class="card"><h3>Lien avec le cours</h3><p>Chapitre 6 : transformations étroites et larges, actions, paires clé/valeur, jointures, DAG, cache, persist, unpersist, saveAsTextFile.</p></div><div class="card metier"><h3>Enjeu métier (IAGE)</h3><p>Un indicateur calculé sur des données sales est faux. Fiabiliser la donnée, tracer les rejets et remonter les causes au DSI fait partie du métier de contrôleur de gestion.</p></div></section>
 <div class="doc-layout">
   <nav class="toc card" aria-label="Sommaire"><h2>Sommaire</h2><ol></ol></nav>
   <main class="doc">
 <h2 id="introduction">Introduction</h2>
-    <p>Au TP5, Spark tournait sur une seule machine : le driver, YARN et les executors se partageaient la même VM. Les notions du chapitre 6
-    (executors répartis, shuffle, localité, résilience) n'y étaient visibles qu'en théorie. Ce TP reprend <strong>le cluster de 4 machines virtuelles
-    du TP2</strong> et y ajoute Spark :</p>
-    <ul>
-      <li>Spark n'est installé que sur le <strong>master</strong>, qui devient le poste d'où l'on soumet les applications (le driver y tourne) ;</li>
-      <li>les <strong>trois workers</strong> ne reçoivent rien de nouveau : YARN y lance les executors dans des conteneurs, et les bibliothèques de Spark arrivent depuis HDFS ;</li>
-      <li>MapReduce (TP2) et Spark se partagent ainsi le même stockage (HDFS) et le même gestionnaire de ressources (YARN).</li>
-    </ul>
-    <div class="box box-info">
-      <strong>Objectif du TP :</strong> installer <strong>Apache Spark</strong> <span class="badge badge-spark">4.2.0</span> sur le master du cluster du TP2
-      (Hadoop <span class="badge badge-hadoop">3.5.0</span>, <span class="badge badge-java">Java 21</span>), exécuter les traitements du TP5 sur
-      <strong>trois executors répartis sur trois machines</strong>, et observer la localité des données, le shuffle sur le réseau et la reprise après une panne.
-    </div>
-    <h3>Architecture du cluster après ce TP</h3>
+<p><strong>Teranga Distrib</strong> exploite huit supermarchés au Sénégal : Dakar, Rufisque, Thiès, Mbour, Touba, Kaolack, Saint-Louis et Ziguinchor.
+Chaque mois, les caisses produisent un export de leurs ventes. Le contrôle de gestion a reçu les <strong>douze exports de l'année 2025</strong>, mis bout à bout
+dans un seul fichier, pour préparer le bilan annuel présenté au comité de direction.</p>
+<p>Problème : les caisses ne sont pas toutes paramétrées de la même façon, certaines saisies sont manuelles, et des transmissions ont échoué ou ont été faites
+deux fois. Avant toute analyse, il faut <strong>nettoyer</strong> les données, <strong>garder la trace</strong> de ce qui a été rejeté, puis <strong>produire les indicateurs</strong>.
+Le fichier est assez gros pour que l'usage du <strong>cache</strong> fasse une différence mesurable.</p>
+<div class="box box-warning"><strong>Règles du TP.</strong>
+<ul>
+  <li>On travaille <strong>exclusivement avec l'API RDD</strong> du chapitre 6 (<code>sc.textFile</code>, <code>map</code>, <code>filter</code>, <code>reduceByKey</code>, <code>join</code>…).</li>
+  <li><code>collect()</code> est interdit sur un RDD de plus de quelques centaines d'éléments : utilisez <code>take</code>, <code>takeOrdered</code>, <code>count</code>, ou écrivez le résultat.</li>
+  <li>Chaque analyse de la section 6 est <strong>enregistrée dans HDFS</strong> avec <code>saveAsTextFile</code>.</li>
+  <li>Pour chaque question, gardez le code, le résultat et une phrase d'explication : ils constituent le rapport.</li>
+</ul></div>
+
+    <h3>Le chemin des données</h3>
     <div class="mermaid-container">
     <pre class="mermaid">
-%%{init: {"flowchart": {"nodeSpacing": 40, "rankSpacing": 70, "padding": 20, "htmlLabels": true, "curve": "linear"}}}%%
-flowchart TB
-  subgraph masterNode ["master 192.168.56.10"]
-    direction LR
-    NN["NameNode"]
-    RM["ResourceManager"]
-    DRV["Spark : driver<br/>pyspark, spark-submit"]
-  end
-  subgraph w1 ["datanode1 192.168.56.11"]
-    direction LR
-    DN1["DataNode"]
-    NM1["NodeManager<br/>ApplicationMaster + executor 1"]
-  end
-  subgraph w2 ["datanode2 192.168.56.12"]
-    direction LR
-    DN2["DataNode"]
-    NM2["NodeManager<br/>executor 2"]
-  end
-  subgraph w3 ["datanode3 192.168.56.13"]
-    direction LR
-    DN3["DataNode"]
-    NM3["NodeManager<br/>executor 3"]
-  end
-  DRV --&gt;|"1. demande"| RM
-  RM --&gt;|"2. conteneurs"| NM1
-  RM --&gt; NM2
-  RM --&gt; NM3
-  DRV -.-&gt;|"3. tâches"| NM1
-  DRV -.-&gt; NM2
-  DRV -.-&gt; NM3
+%%{init: {"flowchart": {"nodeSpacing": 35, "rankSpacing": 55, "padding": 16, "htmlLabels": true, "curve": "linear"}}}%%
+flowchart LR
+  BRUT["brut/ventes_teranga_2025.csv<br/>1,1 million de lignes"]
+  AN["analysees<br/>map(analyser)"]
+  REJ["rejets<br/>motif + ligne"]
+  VAL["valides"]
+  PROP["propres<br/>dédoublonnées<br/>(en cache)"]
+  RES["resultats/q17 … q31<br/>saveAsTextFile"]
+  BRUT --&gt;|"textFile"| AN
+  AN --&gt;|"filter"| REJ
+  AN --&gt;|"filter"| VAL
+  VAL --&gt;|"reduceByKey<br/>sur id_vente"| PROP
+  PROP --&gt;|"analyses"| RES
+  REJ -.-&gt;|"saveAsTextFile"| RJ["rejets/"]
+  PROP -.-&gt;|"saveAsTextFile"| PR["propres/"]
     </pre>
     </div>
-    <p class="archi-legend">
-      <strong>Légende :</strong> le driver reste sur le master (mode <em>client</em>). YARN place l'ApplicationMaster et un executor par worker.
-      Chaque executor lit en priorité les blocs HDFS de son propre nœud (localité), et les executors échangent les données du shuffle par le réseau host-only.
-      Le master n'a pas de NodeManager (fichier <code>workers</code> du TP2) : aucun executor n'y tourne.
-    </p>
-<h2 id="1-prerequis">1. Prérequis</h2>
-    <h3>1.1 Ce que vous devez avoir terminé</h3>
-    <ul>
-      <li>Le <a href="tp2.html">TP2</a> : cluster de 4 VM opérationnel (HDFS avec 3 DataNodes, YARN avec 3 NodeManagers).</li>
-      <li>Le <a href="tp5.html">TP5</a> : vous réutiliserez ses scripts (<code>gen_ventes.py</code>, <code>ca_par_ville.py</code>) et ses notions (DAG, cache, shuffle).</li>
-    </ul>
-    <h3>1.2 Passer les machines virtuelles à 3 Go de mémoire</h3>
-    <p>Avec 2 Go par VM (TP2), un worker ne peut accueillir qu'un seul conteneur Spark, et le master n'a pas assez de mémoire pour le driver.
-    On passe donc chaque VM à <strong>3 Go</strong> :</p>
-    <table>
-      <thead><tr><th>VM</th><th>Mémoire TP2</th><th>Mémoire TP6</th><th>Ce qui y tourne en plus</th></tr></thead>
-      <tbody>
-        <tr><td>hadoop-master</td><td>2 Go</td><td><strong>3 Go</strong></td><td>le driver Spark (JVM + Python)</td></tr>
-        <tr><td>hadoop-datanode1 à 3</td><td>2 Go</td><td><strong>3 Go</strong></td><td>un executor Spark par worker (et l'ApplicationMaster sur l'un d'eux)</td></tr>
-        <tr><td><em>Total</em></td><td>8 Go</td><td><strong>12 Go</strong></td><td>un poste de 16 Go est nécessaire</td></tr>
-      </tbody>
-    </table>
-    <ol>
-      <li>Sur master, arrêtez proprement le cluster : <code>stop-yarn.sh</code> puis <code>stop-dfs.sh</code>.</li>
-      <li>Éteignez les 4 VM (<code>sudo poweroff</code> dans chacune).</li>
-      <li>Dans VirtualBox, pour chaque VM : <strong>Configuration → Système → Carte mère → Mémoire vive</strong> : <code>3072</code> Mo.</li>
-      <li>Redémarrez les 4 VM.</li>
-    </ol>
-    <h3>1.3 Vérifier la résolution des noms</h3>
-    <p>Sur un vrai cluster, le driver (sur master) et les executors (sur les workers) doivent se joindre par leurs adresses <strong>host-only</strong>.
-    Sur <strong>chacune des 4 VM</strong>, vérifiez :</p>
-<pre>getent hosts master datanode1 datanode2 datanode3
-grep -n "127.0.1.1" /etc/hosts
-</pre>
-    <p>La première commande doit afficher les quatre adresses <code>192.168.56.10</code> à <code>.13</code>. La seconde ne doit afficher
-    <strong>aucune</strong> ligne contenant le nom de la machine (par exemple <code>127.0.1.1 master</code>) : Ubuntu en ajoute une à l'installation.
-    Si elle existe, supprimez-la :</p>
-<pre>sudo sed -i '/^127\.0\.1\.1/d' /etc/hosts
-</pre>
-    <div class="box box-warning">
-      <strong>Pourquoi c'est important :</strong> si <code>master</code> se résout en <code>127.0.1.1</code>, le driver s'annonce avec cette adresse de bouclage.
-      Les executors, sur les workers, essaient alors de s'y connecter… et tombent sur eux-mêmes. L'application reste bloquée sur
-      <em>« Initial job has not accepted any resources »</em>.
-    </div>
-<h2 id="2-remettre-le-cluster-a-niveau">2. Remettre le cluster à niveau</h2>
-    <p>Quatre réglages, repris de l'expérience du TP5, sont à ajouter à la configuration du TP2. Les fichiers sont modifiés sur <strong>master</strong>,
-    puis copiés vers les workers (section 2.5).</p>
-    <h3>2.1 Des dossiers de travail sur le disque (sur les 4 VM)</h3>
-    <p>Sur Ubuntu Server 26.04, <code>/tmp</code> est en mémoire vive (<em>tmpfs</em>) : il est petit, vidé à chaque redémarrage, et le TP2 y place les journaux
-    de Hadoop. Or YARN y recopie aussi les bibliothèques de chaque application Spark (plusieurs centaines de Mo) : il serait vite saturé
-    (<em>« Disk quota exceeded »</em>). On crée donc deux dossiers sur le disque, <strong>sur chacune des 4 VM</strong> :</p>
-<pre>sudo mkdir -p /hadoop/tmp /hadoop/logs
-sudo chown -R hadoop:hadoop /hadoop
-df -h /tmp /hadoop
-</pre>
-    <h3>2.2 hadoop-env.sh : les journaux sur le disque</h3>
-    <p>Sur master, dans <code>$HADOOP_HOME/etc/hadoop</code> :</p>
-<pre>cd $HADOOP_HOME/etc/hadoop
-sed -i 's#^export HADOOP_LOG_DIR=.*#export HADOOP_LOG_DIR=/hadoop/logs#' hadoop-env.sh
-grep HADOOP_LOG_DIR hadoop-env.sh
-</pre>
-    <h3>2.3 core-site.xml : le dossier de travail de Hadoop</h3>
-    <p>Ajoutez dans <code>core-site.xml</code>, à l'intérieur de <code>&lt;configuration&gt;</code> :</p>
-<pre class="xml">  &lt;property&gt;
-    &lt;name&gt;hadoop.tmp.dir&lt;/name&gt;
-    &lt;value&gt;/hadoop/tmp&lt;/value&gt;
-  &lt;/property&gt;
-</pre>
-    <h3>2.4 yarn-site.xml : mémoire et réglages pour Spark</h3>
-    <p>Dans <code>yarn-site.xml</code>, passez les deux valeurs de mémoire du TP2 de <code>1536</code> à <code>2560</code> :</p>
-<pre>sed -i 's#&lt;value&gt;1536&lt;/value&gt;#&lt;value&gt;2560&lt;/value&gt;#' yarn-site.xml
-grep -B1 "2560" yarn-site.xml
-</pre>
-    <p>Puis ajoutez ces quatre propriétés, à l'intérieur de <code>&lt;configuration&gt;</code> :</p>
-<pre class="xml">  &lt;property&gt;
-    &lt;name&gt;yarn.scheduler.minimum-allocation-mb&lt;/name&gt;
-    &lt;value&gt;512&lt;/value&gt;
-  &lt;/property&gt;
-  &lt;property&gt;
-    &lt;name&gt;yarn.nodemanager.vmem-check-enabled&lt;/name&gt;
-    &lt;value&gt;false&lt;/value&gt;
-  &lt;/property&gt;
-  &lt;property&gt;
-    &lt;name&gt;yarn.log-aggregation-enable&lt;/name&gt;
-    &lt;value&gt;true&lt;/value&gt;
-  &lt;/property&gt;
-  &lt;property&gt;
-    &lt;name&gt;yarn.nodemanager.bind-host&lt;/name&gt;
-    &lt;value&gt;0.0.0.0&lt;/value&gt;
-  &lt;/property&gt;
-</pre>
-    <div class="box box-info">
-      <strong>Le calcul de la mémoire (à comprendre) :</strong> chaque worker offre désormais 2 560 Mo à YARN. Un conteneur reçoit la mémoire demandée
-      + une marge de 384 Mo, arrondie au multiple de <code>minimum-allocation-mb</code> (512 Mo) supérieur :
-      <ul>
-        <li>executor : 1 024 + 384 = 1 408 Mo → <strong>1 536 Mo</strong> ;</li>
-        <li>ApplicationMaster : 512 + 384 = 896 Mo → <strong>1 024 Mo</strong> ;</li>
-        <li>le worker qui reçoit l'ApplicationMaster : 1 536 + 1 024 = <strong>2 560 Mo</strong>, pile la capacité ; les deux autres : un executor chacun.</li>
-      </ul>
-      Résultat : <strong>3 executors, un par worker</strong>. Avec l'arrondi par défaut à 1 024 Mo, l'executor occuperait 2 048 Mo et le worker de
-      l'ApplicationMaster ne pourrait plus en accueillir : on n'aurait que 2 executors.
-    </div>
-    <ul>
-      <li><code>vmem-check-enabled = false</code> et <code>log-aggregation-enable = true</code> : mêmes raisons qu'au TP5 (section 5.1).</li>
-      <li><code>nodemanager.bind-host = 0.0.0.0</code> : les pages des NodeManagers (journaux des conteneurs) restent joignables depuis votre poste.</li>
-    </ul>
-    <h3>2.5 Copier la configuration et redémarrer</h3>
-    <p>Sur master, avec la boucle du TP2 (section 7.7) :</p>
-<pre>cd $HADOOP_HOME/etc/hadoop
-for host in datanode1 datanode2 datanode3; do
-  scp hadoop-env.sh core-site.xml yarn-site.xml hadoop@$host:$HADOOP_CONF_DIR/
-done
+    <p class="archi-legend"><strong>Légende :</strong> chaque boîte est un RDD ou un dossier HDFS. <code>propres</code> sert à une vingtaine d'analyses :
+    c'est lui que l'on garde en cache (section 5).</p>
+<h2 id="1-les-donnees">1. Les données</h2>
+<p>Deux fichiers sont fournis :</p>
+<table>
+  <thead><tr><th>Fichier</th><th>Contenu</th></tr></thead>
+  <tbody>
+    <tr><td><code>ventes_teranga_2025.csv.gz</code></td><td>l'export annuel des caisses, compressé (environ 98 Mo une fois décompressé, un peu plus d'un million de lignes). Séparateur : point-virgule. Une ligne = une ligne de ticket de caisse.</td></tr>
+    <tr><td><code>magasins.csv</code></td><td>le référentiel des magasins tenu par la direction : <code>magasin;region;surface_m2;ouverture</code>.</td></tr>
+  </tbody>
+</table>
 
-start-dfs.sh
-start-yarn.sh
-hdfs dfsadmin -report | grep "Live datanodes"
-yarn node -list
-</pre>
-    <p>Vous devez lire <strong>Live datanodes (3)</strong> et trois NodeManagers à l'état <code>RUNNING</code>. Sur
-    <a href="http://192.168.56.10:8088/cluster/nodes">http://192.168.56.10:8088/cluster/nodes</a>, chaque nœud affiche <strong>2.5 GB</strong> de mémoire disponible.</p>
-    <div class="box box-info">
-      Les données HDFS ne bougent pas : leurs dossiers (<code>/hadoop/dfs</code>) sont fixés séparément dans <code>hdfs-site.xml</code> depuis le TP2.
-      Aucun nouveau formatage du NameNode n'est nécessaire.
+    <h3>Télécharger les données</h3>
+    <div class="downloads">
+      <a class="dl-btn" href="data/ventes_teranga_2025.csv.gz" download><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>ventes_teranga_2025.csv.gz (21 Mo)</span></a>
+      <a class="dl-btn" href="data/magasins.csv" download><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>magasins.csv (référentiel)</span></a>
     </div>
-<h2 id="3-installer-spark-sur-le-master">3. Installer Spark sur le master</h2>
-    <p>Toute cette section se fait sur <strong>master</strong>, avec l'utilisateur <code>hadoop</code>. Rien n'est installé sur les workers.</p>
-    <h3>3.1 Téléchargement</h3>
+    <p class="small"><em>Si le navigateur ouvre <code>magasins.csv</code> au lieu de l'enregistrer : clic droit, puis « Enregistrer le lien sous… ».</em></p>
+<p>Colonnes attendues dans l'export des ventes :</p>
+<table>
+  <thead><tr><th>#</th><th>Colonne</th><th>Description</th><th>Exemple</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td><code>id_vente</code></td><td>identifiant unique de la ligne de vente</td><td><code>V00064455</code></td></tr>
+    <tr><td>1</td><td><code>id_ticket</code></td><td>identifiant du ticket de caisse (un ticket = plusieurs lignes)</td><td><code>T0024526</code></td></tr>
+    <tr><td>2</td><td><code>date</code></td><td>date de la vente, attendue au format <code>aaaa-mm-jj</code></td><td><code>2025-01-23</code></td></tr>
+    <tr><td>3</td><td><code>heure</code></td><td>heure du passage en caisse</td><td><code>13:50</code></td></tr>
+    <tr><td>4</td><td><code>magasin</code></td><td>ville du magasin</td><td><code>Ziguinchor</code></td></tr>
+    <tr><td>5</td><td><code>categorie</code></td><td>rayon : Alimentation, Boissons, Hygiène, Entretien, Électroménager, Textile</td><td><code>Alimentation</code></td></tr>
+    <tr><td>6</td><td><code>produit</code></td><td>libellé du produit</td><td><code>Riz brisé 25 kg</code></td></tr>
+    <tr><td>7</td><td><code>quantite</code></td><td>quantité ; <strong>négative pour un retour</strong> (remboursement)</td><td><code>5</code></td></tr>
+    <tr><td>8</td><td><code>prix_unitaire</code></td><td>prix unitaire en francs CFA, entier</td><td><code>18250</code></td></tr>
+    <tr><td>9</td><td><code>paiement</code></td><td>Espèces, Wave, Orange Money, Carte bancaire ou Free Money</td><td><code>Orange Money</code></td></tr>
+    <tr><td>10</td><td><code>id_client</code></td><td>numéro de carte de fidélité ; <strong>vide</strong> si le client n'en a pas</td><td><code>C08686</code></td></tr>
+  </tbody>
+</table>
+<p>Le montant d'une ligne est <code>quantite × prix_unitaire</code>. Le <strong>CA net</strong> est la somme des montants, retours compris (ils sont négatifs).</p>
+<h2 id="2-mise-en-place">2. Mise en place</h2>
+<p>Démarrez la VM du TP5, puis HDFS, YARN et le serveur d'historique. Téléchargez les deux fichiers (section 1), copiez-les dans la VM depuis votre poste (<code>scp ventes_teranga_2025.csv.gz magasins.csv hadoop@IP_DE_LA_VM:~</code>), puis :</p>
 <pre>cd ~
-wget https://archive.apache.org/dist/spark/spark-4.2.0/spark-4.2.0-bin-hadoop3.tgz
-tar -xzf spark-4.2.0-bin-hadoop3.tgz
-sudo mv spark-4.2.0-bin-hadoop3 /opt/spark
-sudo chown -R hadoop:hadoop /opt/spark
-rm spark-4.2.0-bin-hadoop3.tgz
-</pre>
-    <h3>3.2 Variables d'environnement</h3>
-    <p>Ajoutez à la fin de <code>~/.bashrc</code> (<code>HADOOP_HOME</code> et <code>HADOOP_CONF_DIR</code> y sont déjà depuis le TP2) :</p>
-<pre># ---- Spark Environment Variables ----
-export SPARK_HOME=/opt/spark
-export PATH=$PATH:$SPARK_HOME/bin
-export YARN_CONF_DIR=$HADOOP_HOME/etc/hadoop
-export PYSPARK_PYTHON=python3
-</pre>
-<pre>source ~/.bashrc
-spark-submit --version
-</pre>
-    <h3>3.3 spark-env.sh : l'adresse du driver et l'environnement</h3>
-<pre>mkdir -p ~/tmp
-cd $SPARK_HOME/conf
-cp spark-env.sh.template spark-env.sh
-cat &gt;&gt; spark-env.sh &lt;&lt; 'EOF'
-export SPARK_LOCAL_IP=192.168.56.10
-export HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop
-export YARN_CONF_DIR=/opt/hadoop/etc/hadoop
-export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
-export SPARK_LOCAL_DIRS=/home/hadoop/tmp
-export SPARK_SUBMIT_OPTS="-Djava.io.tmpdir=/home/hadoop/tmp"
-EOF
-cp log4j2.properties.template log4j2.properties
-sed -i 's/^rootLogger.level = info/rootLogger.level = warn/' log4j2.properties
-</pre>
-    <div class="box box-warning">
-      <strong>Pourquoi <code>SPARK_LOCAL_IP</code> ?</strong> Chaque VM a deux cartes réseau, et la carte NAT porte <strong>la même adresse
-      (<code>10.0.2.15</code>) sur les quatre VM</strong>. Si le driver s'annonçait avec cette adresse, chaque executor se connecterait… à sa propre machine.
-      On impose donc l'adresse host-only du master. Les autres lignes reprennent les leçons du TP5 : variables lues par Spark quel que soit le programme
-      qui le lance (terminal, PyCharm, notebook), et fichiers temporaires hors de <code>/tmp</code>.
-    </div>
-    <h3>3.4 spark-defaults.conf</h3>
-<pre>cp spark-defaults.conf.template spark-defaults.conf
-nano spark-defaults.conf
-</pre>
-    <p>Ajoutez à la fin :</p>
-<pre class="plain">spark.master                     yarn
-spark.submit.deployMode          client
-spark.driver.memory              512m
-spark.executor.instances         3
-spark.executor.cores             1
-spark.executor.memory            1g
-spark.yarn.am.memory             512m
-spark.eventLog.enabled           true
-spark.eventLog.dir               hdfs://master:8020/spark-logs
-spark.history.fs.logDirectory    hdfs://master:8020/spark-logs
-spark.yarn.historyServer.address master:18080</pre>
-    <h3>3.5 Préparer HDFS : historique et bibliothèques</h3>
-    <p>Comme au TP5 (section 5.4), on dépose une seule fois les bibliothèques de Spark dans HDFS : sur un cluster, elles seraient sinon recopiées vers
-    les trois workers à <strong>chaque</strong> application. Procédez étape par étape et vérifiez chaque résultat :</p>
-<pre>hdfs dfs -mkdir -p /spark-logs /spark-jars
+gunzip -k ventes_teranga_2025.csv.gz          # -k garde aussi le .gz
+ls -lh ventes_teranga_2025.csv*
 
-cd ~
-python3 -m zipfile -c spark-libs.zip $SPARK_HOME/jars/*.jar
-ls -lh spark-libs.zip
-hdfs dfs -put -f spark-libs.zip /spark-jars/
-hdfs dfs -ls -h /spark-jars
+hdfs dfs -mkdir -p /teranga/brut /teranga/ref /teranga/resultats
+hdfs dfs -put -f ventes_teranga_2025.csv ventes_teranga_2025.csv.gz /teranga/brut/
+hdfs dfs -put -f magasins.csv /teranga/ref/
+hdfs dfs -ls -h -R /teranga
 </pre>
-    <p>Seulement si l'archive apparaît dans HDFS avec la bonne taille :</p>
-<pre>rm ~/spark-libs.zip
-echo "spark.yarn.archive               hdfs://master:8020/spark-jars/spark-libs.zip" &gt;&gt; $SPARK_HOME/conf/spark-defaults.conf
-</pre>
-    <div class="box box-info">
-      Avec <code>dfs.replication = 3</code>, l'archive est présente sur les trois workers : chaque NodeManager la récupère localement, une fois,
-      et la garde en cache pour les applications suivantes.
-    </div>
-<h2 id="4-valider-spark-sur-le-cluster">4. Valider Spark sur le cluster</h2>
-    <h3>4.1 L'exemple Pi</h3>
-<pre>spark-submit $SPARK_HOME/examples/src/main/python/pi.py 30
-</pre>
-    <p>Vous devez lire <code>Pi is roughly 3.14…</code>. Sur <a href="http://192.168.56.10:8088">http://192.168.56.10:8088</a>, l'application
-    <code>PythonPi</code> apparaît avec le type <strong>SPARK</strong>, à côté des jobs MapReduce du TP2.</p>
-    <h3>4.2 Qui tourne où ?</h3>
-    <p>Ouvrez un shell sur le master et laissez-le ouvert :</p>
-<pre>pyspark
-</pre>
-    <p>Ouvrez ensuite <a href="http://192.168.56.10:4040/executors/">http://192.168.56.10:4040/executors/</a> depuis le navigateur de votre poste :
-    le réseau host-only est directement joignable, aucun tunnel n'est nécessaire. Dans un autre terminal, lancez <code>jps</code> sur
-    <strong>chacune des 4 VM</strong> (<code>ssh datanode1 jps</code> depuis master, par exemple).</p>
-    <table>
-      <thead><tr><th>Machine</th><th>Processus Spark vus par <code>jps</code></th><th>Rôle (chapitre 6)</th></tr></thead>
-      <tbody>
-        <tr><td>master</td><td>SparkSubmit</td><td>?</td></tr>
-        <tr><td>un des workers</td><td>ExecutorLauncher + YarnCoarseGrainedExecutorBackend</td><td>?</td></tr>
-        <tr><td>les deux autres workers</td><td>YarnCoarseGrainedExecutorBackend</td><td>?</td></tr>
-      </tbody>
-    </table>
-    <div class="box box-metier">
-      <strong>Question 1 :</strong> complétez la colonne « Rôle ». Dans l'onglet <em>Executors</em>, relevez la machine (<em>Address</em>) de chaque executor
-      et sa mémoire de stockage. Pourquoi aucun executor ne tourne-t-il sur master ? Pourquoi l'ApplicationMaster et un executor partagent-ils un même worker ?
-    </div>
-    <p>Gardez ce shell ouvert pour la section 5.</p>
-<h2 id="5-le-fil-rouge-distribue">5. Le fil rouge, distribué</h2>
-    <h3>5.1 Des données réparties sur les trois workers</h3>
-    <p>Sur master, recréez <code>purchases.txt</code> et <code>gen_ventes.py</code> du <a href="tp5.html">TP5</a> (section 7.1), puis générez
-    <strong>6 millions</strong> de ventes, soit environ 300 Mo et 3 blocs HDFS :</p>
-<pre>cd ~
-python3 gen_ventes.py 6000000
-ls -lh purchases_big.txt
-hdfs dfs -mkdir -p /input
-hdfs dfs -put -f purchases.txt purchases_big.txt /input/
-hdfs fsck /input/purchases_big.txt -files -blocks -locations
-</pre>
-    <p>La dernière commande liste chaque bloc et les trois DataNodes qui en détiennent une copie (réplication ×3 du TP2).</p>
-    <h3>5.2 Le chiffre d'affaires par ville, sur trois machines</h3>
-    <p>Dans le shell <code>pyspark</code> resté ouvert :</p>
+<div class="box box-info"><strong>Je recommande de travailler avec PyCharm</strong>, dans un notebook relié à la VM par l'interpréteur SSH
+(TP5, section 8) : vous gardez tout votre code et vos résultats d'une séance à l'autre, et le notebook devient directement votre livrable.
+Le shell <code>pyspark</code> reste possible pour un test rapide.</div>
+<p>En début de session :</p>
 <pre class="python"><span class="py-kw">import</span> time
-big = sc.textFile(<span class="py-str">"hdfs:///input/purchases_big.txt"</span>)
-big.getNumPartitions()                                   <span class="py-com"># une partition par bloc</span>
-paires = big.map(<span class="py-kw">lambda</span> l: l.split(<span class="py-str">"\t"</span>)).map(<span class="py-kw">lambda</span> c: (c[2], float(c[4])))
-ca = paires.reduceByKey(<span class="py-kw">lambda</span> a, b: a + b)
+<span class="py-kw">import</span> unicodedata
+<span class="py-kw">import</span> datetime <span class="py-kw">as</span> dt
+<span class="py-kw">from</span> pyspark <span class="py-kw">import</span> StorageLevel
 
-t = time.time()
-print(ca.takeOrdered(5, key=<span class="py-kw">lambda</span> t: -t[1]), round(time.time() - t, 1), <span class="py-str">"s"</span>)</pre>
-    <p>Dans l'onglet <strong>Stages</strong> de l'interface, ouvrez le premier stage du job et regardez le tableau des tâches :
-    colonnes <em>Executor ID / Host</em> et <em>Locality Level</em>.</p>
+BASE = <span class="py-str">"hdfs:///teranga"</span>
+BRUT = <span class="py-str">f"{BASE}/brut/ventes_teranga_2025.csv"</span>
+REF = <span class="py-str">f"{BASE}/ref/magasins.csv"</span>
+RES = <span class="py-str">f"{BASE}/resultats"</span>
+
+<span class="py-kw">def</span> chrono(action):
+    <span class="py-str">""</span><span class="py-str">"Exécute action() et renvoie (résultat, durée en secondes)."</span><span class="py-str">""</span>
+    t = time.time()
+    r = action()
+    <span class="py-kw">return</span> r, round(time.time() - t, 2)
+
+<span class="py-com"># exemple : n, duree = chrono(lambda: lignes.count())</span></pre>
+<div class="box box-info">Gardez l'interface web de l'application ouverte (port 4040, par le tunnel SSH ou le relais YARN du TP5) : la plupart des questions
+vous demandent d'y relever des jobs, des stages, des tâches ou l'état du cache.</div>
+<h2 id="3-explorer-le-fichier-brut">3. Explorer le fichier brut</h2>
+<p>Avant de nettoyer, on <strong>mesure</strong> l'étendue des dégâts. Toutes les questions de cette section se résolvent avec des transformations et des actions simples.</p>
     <div class="box box-metier">
-      <strong>Question 2 :</strong> combien de tâches compte le premier stage, et comment se répartissent-elles entre les trois workers ?
-      Quel niveau de localité observez-vous ? Expliquez-le à l'aide de la réplication ×3 du TP2. Comparez le temps obtenu avec celui du TP5
-      (une seule VM) : qu'est-ce qui accélère, qu'est-ce qui ralentit ?
+      <strong>Question 1 : Lignes et partitions</strong>
+      <div><ol type="a">
+<li>Chargez le fichier avec <code>sc.textFile(BRUT)</code>. Combien de partitions obtenez-vous ? Expliquez ce chiffre à l'aide de la taille du fichier et de la taille d'un bloc HDFS
+(<code>hdfs fsck /teranga/brut/ventes_teranga_2025.csv -files -blocks</code>).</li>
+<li>Rechargez-le avec <code>sc.textFile(BRUT, 4)</code> et conservez ce RDD sous le nom <code>lignes</code> pour toute la suite. Quel est l'intérêt sur la VM du TP5 ?</li>
+<li>Combien de lignes contient le fichier ? Affichez les 5 premières <strong>sans</strong> <code>collect()</code>.</li>
+<li><em>Bonus.</em> Lisez directement le fichier <code>.gz</code> avec <code>sc.textFile(…, 4)</code>. Combien de partitions ? Pourquoi ? Quelle conséquence pour un fichier compressé de 100 Go ?</li>
+</ol></div>
     </div>
-    <h3>5.3 Rendre la localité visible</h3>
-    <p>Avec trois copies de chaque bloc sur trois workers, toutes les lectures sont locales. Déposons le même fichier avec <strong>une seule copie</strong> :</p>
-<pre>hdfs dfs -D dfs.replication=1 -put -f ~/purchases_big.txt /input/purchases_r1.txt
-hdfs fsck /input/purchases_r1.txt -files -blocks -locations
-</pre>
-<pre class="python">r1 = sc.textFile(<span class="py-str">"hdfs:///input/purchases_r1.txt"</span>)
-r1.map(<span class="py-kw">lambda</span> l: l.split(<span class="py-str">"\t"</span>)).map(<span class="py-kw">lambda</span> c: (c[2], float(c[4]))) \
-  .reduceByKey(<span class="py-kw">lambda</span> a, b: a + b).count()</pre>
     <div class="box box-metier">
-      <strong>Question 3 :</strong> d'après <code>fsck</code>, sur quel nœud se trouve chaque bloc de <code>purchases_r1.txt</code> ?
-      Dans l'onglet Stages, chaque tâche a-t-elle tourné sur le nœud qui détient son bloc ? Relevez les niveaux de localité
-      (<code>NODE_LOCAL</code>, <code>RACK_LOCAL</code>, <code>ANY</code>) et expliquez ce que coûte une lecture non locale.
+      <strong>Question 2 : Les lignes d'en-tête</strong>
+      <div>Combien de lignes commencent par <code>id_vente</code> ? Pourquoi y en a-t-il plusieurs ? Pourquoi la technique du chapitre 6
+(<code>lignes.first()</code> pour repérer l'en-tête) ne suffit-elle pas ici ?</div>
     </div>
-    <h3>5.4 Le shuffle traverse maintenant le réseau</h3>
-<pre class="python">r_reduce = paires.reduceByKey(<span class="py-kw">lambda</span> a, b: a + b).collect()
-r_group = paires.groupByKey().mapValues(sum).collect()</pre>
-    <p>Dans l'onglet Stages, comparez pour les deux jobs les colonnes <strong>Shuffle Write</strong> et <strong>Shuffle Read</strong> (dans le détail d'un stage :
-    <em>Remote Bytes Read</em>, les octets venus d'un autre worker).</p>
     <div class="box box-metier">
-      <strong>Question 4 :</strong> relevez les volumes de shuffle des deux jobs et la part lue à distance. Pourquoi l'écart entre <code>reduceByKey</code>
-      et <code>groupByKey</code> compte-t-il davantage sur un cluster que sur la VM unique du TP5 ? Faites le lien avec le combiner du chapitre 4.
+      <strong>Question 3 : Les lignes vides</strong>
+      <div>Combien de lignes sont vides ou ne contiennent que des espaces ou des tabulations ?</div>
     </div>
-<h2 id="6-experience-une-machine-tombe-en-panne">6. Expérience : une machine tombe en panne</h2>
-    <p>Au chapitre 6, la résilience des RDD reposait sur le <strong>lignage</strong> : une partition perdue est recalculée à partir de sa recette.
-    On le vérifie en arrêtant un worker en plein travail.</p>
-    <h3>6.1 Remplir le cache sur les trois executors</h3>
-<pre class="python">paires.cache()
-paires.count()        <span class="py-com"># lit HDFS et remplit le cache sur les trois executors</span></pre>
-    <p>Dans l'onglet <strong>Storage</strong>, notez le nombre de partitions en cache (<em>Cached Partitions</em>) et, dans le détail, leur répartition par executor.</p>
-    <h3>6.2 Arrêter un worker</h3>
-    <p>Dans un second terminal, sur <strong>datanode2</strong>, arrêtez son NodeManager : YARN tue aussitôt les conteneurs de ce nœud, dont un executor.</p>
-<pre>ssh datanode2
-yarn --daemon stop nodemanager
-exit
-</pre>
-    <h3>6.3 Relancer le calcul</h3>
-    <p>Revenez au shell <code>pyspark</code> et relancez le chiffre d'affaires :</p>
-<pre class="python">t = time.time()
-print(paires.reduceByKey(<span class="py-kw">lambda</span> a, b: a + b).takeOrdered(5, key=<span class="py-kw">lambda</span> t: -t[1]),
-      round(time.time() - t, 1), <span class="py-str">"s"</span>)</pre>
-    <p>Observez l'onglet <em>Executors</em> (un executor marqué <em>Dead</em>), l'onglet <em>Storage</em> (partitions en cache) et le détail du dernier
-    stage (tâches qui ne lisent plus depuis le cache).</p>
     <div class="box box-metier">
-      <strong>Question 5 :</strong> le résultat est-il identique à celui de la section 5.2 ? Combien de partitions en cache restait-il après la panne,
-      et comment Spark a-t-il obtenu les autres ? Pourquoi le nombre d'executors ne remonte-t-il pas à trois (aidez-vous du calcul de mémoire de la section 2.4) ?
-      Comparez cette résilience par <strong>recalcul</strong> à la résilience par <strong>réplication</strong> de HDFS : que coûte chacune ?
+      <strong>Question 4 : Le nombre de champs</strong>
+      <div><ol type="a">
+<li>Hors lignes vides et en-têtes, calculez la répartition des lignes selon leur nombre de champs (séparateur <code>;</code>), triée par nombre de champs.
+Indice : formez des paires <code>(nombre_de_champs, 1)</code>.</li>
+<li>Affichez <strong>un exemple</strong> de ligne pour chaque nombre de champs anormal. Décrivez les familles d'anomalies que vous observez.</li>
+<li>Combien de jobs et de stages cette question a-t-elle déclenchés dans l'interface 4040 ? Justifiez avec les règles du chapitre 6 (une action = un job, un shuffle = un stage de plus).</li>
+</ol></div>
     </div>
-    <h3>6.4 Remettre le worker en service</h3>
-<pre>ssh datanode2
-yarn --daemon start nodemanager
-exit
-yarn node -list
-</pre>
-    <p>Le DataNode de datanode2 n'a jamais été arrêté : HDFS est resté complet. <em>Pour aller plus loin :</em> arrêtez aussi le DataNode
-    (<code>hdfs --daemon stop datanode</code>) sur <code>purchases_r1.txt</code> (une seule copie) et expliquez ce qui se passe.</p>
-    <p>Quittez le shell (<code>exit()</code>) : le cache et les executors sont libérés.</p>
-<h2 id="7-une-application-en-mode-cluster">7. Une application en mode cluster</h2>
-    <p>Recréez sur master le script <code>ca_par_ville.py</code> du <a href="tp5.html">TP5</a> (section 9), puis soumettez-le en mode <em>cluster</em> :</p>
-<pre>hdfs dfs -rm -r -f /output-spark-ca
-spark-submit --deploy-mode cluster ~/ca_par_ville.py \
-    hdfs:///input/purchases_big.txt hdfs:///output-spark-ca
-</pre>
-    <p>Pendant l'exécution, cherchez avec <code>jps</code> sur les workers le processus <strong>ApplicationMaster</strong> : c'est lui qui contient
-    désormais le driver. À la fin, lisez la sortie du driver :</p>
-<pre>yarn logs -applicationId application_XXXXXXXXXXXXX_XXXX -log_files stdout
-hdfs dfs -cat /output-spark-ca/part-* | head -5
-</pre>
     <div class="box box-metier">
-      <strong>Question 6 :</strong> sur quel worker le driver a-t-il tourné ? Que se passerait-il, en mode client puis en mode cluster, si vous fermiez
-      le terminal du master pendant l'exécution ? Pour un traitement planifié chaque nuit (le tableau de bord du lendemain), lequel choisir et pourquoi ?
+      <strong>Question 5 : Les valeurs de magasin, de catégorie et de moyen de paiement</strong>
+      <div>Sur les lignes à 11 champs, calculez pour chacune des colonnes <code>magasin</code>, <code>categorie</code> et
+<code>paiement</code> la liste des valeurs distinctes avec leur nombre d'occurrences, triée par fréquence décroissante.
+<ol type="a">
+<li>Combien de valeurs distinctes pour chaque colonne, alors qu'il existe 8 magasins, 6 catégories et 5 moyens de paiement ? Classez les variantes observées (casse, espaces, accents, abréviations, synonymes).</li>
+<li>Pourquoi un <code>collect()</code> est-il acceptable ici, alors qu'il ne l'était pas pour le fichier lui-même ?</li>
+</ol>Conservez ces listes : elles servent à construire les dictionnaires de normalisation de la section 4.</div>
     </div>
-<h2 id="8-l-historique-des-applications">8. L'historique des applications</h2>
-<pre>$SPARK_HOME/sbin/start-history-server.sh
-</pre>
-    <p>Ouvrez <a href="http://192.168.56.10:18080">http://192.168.56.10:18080</a> : retrouvez l'application de la section 6 et la trace de l'executor perdu.
-    En fin de séance :</p>
-<pre>$SPARK_HOME/sbin/stop-history-server.sh
-stop-yarn.sh
-stop-dfs.sh
-</pre>
-    <div class="box box-warning">
-      N'utilisez pas <code>$SPARK_HOME/sbin/start-all.sh</code> : ce script lance un cluster Spark <em>Standalone</em>, que nous n'utilisons pas.
-      Pour Hadoop, gardez <code>start-dfs.sh</code> et <code>start-yarn.sh</code> comme au TP2.
+    <div class="box box-metier">
+      <strong>Question 6 : Les prix et les dates</strong>
+      <div><ol type="a">
+<li>Combien de prix ne sont pas composés uniquement de chiffres ? Affichez une douzaine d'exemples et listez les formats rencontrés.</li>
+<li>Combien de dates sont au format <code>aaaa-mm-jj</code>, combien au format <code>jj/mm/aaaa</code> ? Repérez-vous d'autres valeurs ?</li>
+</ol></div>
     </div>
-<h2 id="9-developper-depuis-pycharm-optionnel">9. Développer depuis PyCharm (optionnel)</h2>
-    <p>La démarche de la section 8 du <a href="tp5.html">TP5</a> s'applique à l'identique, avec deux simplifications :</p>
-    <ul>
-      <li>l'hôte de l'interpréteur SSH est directement <code>192.168.56.10</code>, port 22 : le réseau host-only est joignable depuis votre poste ;</li>
-      <li>les variables d'environnement sont déjà dans <code>spark-env.sh</code> (section 3.3) : seuls l'environnement virtuel <code>~/venv-tp5</code>
-        et le fichier <code>spark.pth</code> (TP5, section 8.2) sont à recréer sur master.</li>
-    </ul>
-    <p>Le notebook du TP5 s'exécute alors sur le cluster sans modification : trois executors au lieu d'un.</p>
-<h2 id="10-resolution-des-problemes-courants-depannage">10. Résolution des problèmes courants (Dépannage)</h2>
-    <table>
-      <thead><tr><th>Symptôme</th><th>Cause probable</th><th>Solution</th></tr></thead>
-      <tbody>
-        <tr><td>L'application reste sur <em>« Initial job has not accepted any resources »</em></td><td>Les executors ne joignent pas le driver : adresse annoncée en <code>127.0.1.1</code> ou <code>10.0.2.15</code></td><td>Vérifiez <code>SPARK_LOCAL_IP=192.168.56.10</code> (section 3.3) et l'absence de ligne <code>127.0.1.1</code> dans <code>/etc/hosts</code> (section 1.3).</td></tr>
-        <tr><td>Seulement 2 executors au lieu de 3</td><td>Mémoire YARN insuffisante ou arrondi à 1 024 Mo</td><td>Vérifiez <code>memory-mb = 2560</code> et <code>minimum-allocation-mb = 512</code> sur les <strong>4</strong> nœuds (section 2.4), puis redémarrez YARN.</td></tr>
-        <tr><td>L'application reste en état <strong>ACCEPTED</strong></td><td>Une autre application Spark (shell, notebook) occupe les conteneurs</td><td>Fermez-la (<code>exit()</code>, <code>spark.stop()</code>) ou <code>yarn application -kill &lt;id&gt;</code>.</td></tr>
-        <tr><td><em>« Disk quota exceeded »</em> ou <em>« No space left on device »</em></td><td>Fichiers temporaires dans <code>/tmp</code> (tmpfs)</td><td>Sections 2.1 à 2.3 sur les 4 nœuds et section 3.3 sur master ; nettoyez <code>/tmp/spark-*</code> et <code>/tmp/hadoop-hadoop</code>.</td></tr>
-        <tr><td><em>« File does not exist: …/spark-libs.zip »</em></td><td>La ligne <code>spark.yarn.archive</code> a été ajoutée sans que l'archive soit dans HDFS</td><td><code>sed -i '/spark.yarn.archive/d' $SPARK_HOME/conf/spark-defaults.conf</code>, puis refaites la section 3.5 étape par étape.</td></tr>
-        <tr><td>Conteneur tué : <em>« running beyond virtual memory limits »</em></td><td>Contrôle de la mémoire virtuelle</td><td><code>vmem-check-enabled = false</code> sur les 4 nœuds (section 2.4).</td></tr>
-        <tr><td>Erreur Python dans les executors : <em>« Python in worker has different version »</em></td><td>Version de Python différente entre master et un worker</td><td><code>python3 --version</code> sur les 4 VM : toutes doivent être en 3.14 (Ubuntu Server 26.04).</td></tr>
-        <tr><td>Un NodeManager n'apparaît plus dans <code>yarn node -list</code></td><td>Arrêté à la section 6, ou VM éteinte</td><td><code>yarn --daemon start nodemanager</code> sur le worker concerné.</td></tr>
-      </tbody>
-    </table>
-<h2 id="11-livrable-attendu">11. Livrable attendu</h2>
-    <p>Un court rapport (PDF ou Markdown) contenant :</p>
-    <ul>
-      <li>les modifications de configuration (sections 2 et 3) et une capture de l'onglet <em>Executors</em> montrant les trois workers ;</li>
-      <li>les réponses aux <strong>questions 1 à 6</strong>, avec une capture du tableau des tâches (localité) et une de l'expérience de panne ;</li>
-      <li>un tableau comparant les temps du CA par ville : MapReduce (TP2), Spark sur une VM (TP5), Spark sur le cluster (TP6) ;</li>
-      <li>une phrase de <strong>conclusion métier</strong> : en quoi la reprise après panne observée en section 6 protège-t-elle un processus de gestion
-        (par exemple le tableau de bord commercial du matin) ?</li>
-    </ul>
+<h2 id="4-nettoyer">4. Nettoyer</h2>
+<h3>Les règles de gestion</h3>
+<p>Le contrôle de gestion a fixé les règles suivantes. Une ligne est soit <strong>ignorée</strong> (elle ne contient pas de vente), soit <strong>rejetée</strong>
+(elle est archivée avec son motif), soit <strong>acceptée</strong>, éventuellement après correction.</p>
+<table>
+  <thead><tr><th>Situation</th><th>Décision</th><th>Motif ou correction</th></tr></thead>
+  <tbody>
+    <tr><td>Ligne vide ou blanche</td><td>ignorer</td><td><code>vide</code></td></tr>
+    <tr><td>Ligne d'en-tête</td><td>ignorer</td><td><code>entete</code></td></tr>
+    <tr><td>Nombre de champs différent de 11</td><td>rejeter</td><td><code>nb_champs</code></td></tr>
+    <tr><td>Espaces autour d'un champ</td><td>corriger (les retirer)</td><td>aucune trace</td></tr>
+    <tr><td>Magasin, catégorie ou paiement écrit autrement que la valeur officielle</td><td>corriger (valeur officielle)</td><td><code>magasin</code>, <code>categorie</code>, <code>paiement</code></td></tr>
+    <tr><td>Magasin, catégorie ou paiement impossible à reconnaître</td><td>rejeter</td><td><code>magasin_inconnu</code>, <code>categorie_inconnue</code>, <code>paiement_inconnu</code></td></tr>
+    <tr><td>Date au format <code>jj/mm/aaaa</code></td><td>corriger (convertir en <code>aaaa-mm-jj</code>)</td><td><code>date_jj/mm/aaaa</code></td></tr>
+    <tr><td>Date impossible, ou hors de l'année 2025</td><td>rejeter</td><td><code>date_invalide</code></td></tr>
+    <tr><td>Prix suivi de <code>FCFA</code></td><td>corriger (retirer le suffixe)</td><td><code>prix_FCFA</code></td></tr>
+    <tr><td>Prix avec une virgule décimale (<code>7500,00</code>)</td><td>corriger (lire le nombre)</td><td><code>prix_virgule</code></td></tr>
+    <tr><td>Prix vide ou non numérique</td><td>rejeter</td><td><code>prix_manquant</code></td></tr>
+    <tr><td>Prix négatif, nul ou supérieur à 100 000 FCFA</td><td>rejeter</td><td><code>prix_aberrant</code></td></tr>
+    <tr><td>Quantité non entière</td><td>rejeter</td><td><code>quantite_invalide</code></td></tr>
+    <tr><td>Quantité nulle</td><td>rejeter</td><td><code>quantite_nulle</code></td></tr>
+    <tr><td>Quantité supérieure à 100 en valeur absolue</td><td>rejeter</td><td><code>quantite_aberrante</code></td></tr>
+    <tr><td>Quantité négative</td><td><strong>accepter</strong> : c'est un retour</td><td></td></tr>
+    <tr><td><code>id_client</code> vide</td><td><strong>accepter</strong> : client sans carte de fidélité</td><td></td></tr>
+    <tr><td>Même <code>id_vente</code> présent plusieurs fois</td><td>garder une seule ligne</td><td>(question 9)</td></tr>
+  </tbody>
+</table>
+<h3>Le squelette fourni</h3>
+<p>La fonction <code>analyser(ligne)</code> traite <strong>une</strong> ligne de texte et renvoie un tuple à trois éléments :</p>
+<ul>
+  <li><code>("IGNORE", motif, ligne)</code> ou <code>("REJET", motif, ligne)</code> ;</li>
+  <li><code>("OK", vente, corrections)</code>, où <code>vente</code> est un tuple de 11 champs nettoyés (quantité en <code>int</code>, prix en <code>float</code>, date au format
+    <code>aaaa-mm-jj</code>) et <code>corrections</code> la liste des codes de correction appliqués (par exemple <code>["magasin", "prix_virgule"]</code>).</li>
+</ul>
+<pre class="python"><span class="py-kw">def</span> sans_accents(s):
+    <span class="py-kw">return</span> <span class="py-str">""</span>.join(ch <span class="py-kw">for</span> ch <span class="py-kw">in</span> unicodedata.normalize(<span class="py-str">"NFD"</span>, s) <span class="py-kw">if</span> unicodedata.category(ch) != <span class="py-str">"Mn"</span>)
+
+<span class="py-kw">def</span> cle(s):
+    <span class="py-str">""</span><span class="py-str">"Clé de comparaison : sans espaces autour, sans accents, en majuscules, sans tirets ni apostrophes."</span><span class="py-str">""</span>
+    <span class="py-kw">return</span> sans_accents(s.strip()).upper().replace(<span class="py-str">"-"</span>, <span class="py-str">" "</span>).replace(<span class="py-str">"'"</span>, <span class="py-str">""</span>)
+
+<span class="py-com"># À COMPLÉTER à partir de la question 5 : cle(valeur saisie) -&gt; valeur officielle</span>
+MAGASINS = {<span class="py-str">"DAKAR"</span>: <span class="py-str">"Dakar"</span>, <span class="py-str">"THIES"</span>: <span class="py-str">"Thiès"</span>}
+CATEGORIES = {<span class="py-str">"ALIMENTATION"</span>: <span class="py-str">"Alimentation"</span>}
+PAIEMENTS = {<span class="py-str">"ESPECES"</span>: <span class="py-str">"Espèces"</span>}
+
+<span class="py-com"># position des champs dans une vente</span>
+ID, TICKET, DATE, HEURE, MAG, CAT, PROD, QTE, PRIX, PAIE, CLIENT = range(11)
+
+<span class="py-kw">def</span> analyser(ligne):
+    <span class="py-com"># À ÉCRIRE : appliquer le tableau des règles, dans l'ordre qui vous semble le plus sûr.</span>
+    <span class="py-com"># La fonction ne doit JAMAIS lever d'exception (utilisez try / except ValueError) :</span>
+    <span class="py-com"># une exception dans une lambda fait échouer la tâche, puis tout le job.</span>
+    <span class="py-kw">pass</span></pre>
+<p>Pour vérifier votre fonction, ces deux appels doivent donner exactement :</p>
+<pre class="python">analyser(<span class="py-str">"V1;T1;17/01/2025;10:00; dkr ;Alimentaire;Riz;2;7500,00 FCFA;om;"</span>)
+<span class="py-com"># ('OK', ('V1', 'T1', '2025-01-17', '10:00', 'Dakar', 'Alimentation', 'Riz', 2, 7500.0, 'Orange Money', ''),</span>
+<span class="py-com">#  ['magasin', 'categorie', 'paiement', 'date_jj/mm/aaaa', 'prix_FCFA', 'prix_virgule'])</span>
+
+analyser(<span class="py-str">"V2;T1;2025-02-30;10:00;Dakar;Boissons;Eau;2;400;Wave;"</span>)
+<span class="py-com"># ('REJET', 'date_invalide', 'V2;T1;2025-02-30;10:00;Dakar;Boissons;Eau;2;400;Wave;')</span></pre>
+    <div class="box box-metier">
+      <strong>Question 7 : La fonction d'analyse</strong>
+      <div><ol type="a">
+<li>Complétez les trois dictionnaires et écrivez <code>analyser</code>. Vérifiez-la sur les deux lignes de test, puis sur <code>lignes.take(20)</code>.</li>
+<li>Créez les trois RDD suivants. Pourquoi utilise-t-on <code>map</code> pour <code>analysees</code> et non <code>filter</code> ? Combien de jobs ces trois lignes ont-elles lancés ?</li>
+</ol><pre class="python">analysees = lignes.map(analyser)
+valides = analysees.filter(<span class="py-kw">lambda</span> t: t[0] == <span class="py-str">"OK"</span>)
+rejets = analysees.filter(<span class="py-kw">lambda</span> t: t[0] == <span class="py-str">"REJET"</span>)</pre>
+</div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 8 : Le bilan des rejets</strong>
+      <div><ol type="a">
+<li>Calculez le nombre de lignes par couple <code>(statut, motif)</code>, trié par nombre décroissant.</li>
+<li>Enregistrez les rejets dans <code>/teranga/rejets</code>, une ligne par rejet au format <code>motif;ligne d'origine</code>, avec <code>saveAsTextFile</code>.
+Combien de fichiers <code>part-…</code> sont écrits ? Pourquoi ce nombre ?</li>
+</ol></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 9 : Les doublons</strong>
+      <div><ol type="a">
+<li>Sur les lignes non vides du fichier brut, combien de lignes sont des <strong>doublons exacts</strong> (indice : <code>distinct()</code>) ?</li>
+<li>Dédoublonnez maintenant les ventes valides <strong>sur la clé <code>id_vente</code></strong> pour obtenir le RDD <code>propres</code>
+(des ventes, sans le statut ni les corrections). Combien de doublons retirez-vous ? Pourquoi plus qu'en a) ?</li>
+<li>Pourquoi <code>reduceByKey</code> est-il préférable à <code>groupByKey</code> pour dédoublonner ? Combien de stages compte le job de <code>propres.count()</code> ?</li>
+</ol></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 10 : Enregistrer les données propres et contrôler</strong>
+      <div><ol type="a">
+<li>Enregistrez <code>propres</code> dans <code>/teranga/propres</code> au format CSV (séparateur <code>;</code>, une vente par ligne). Relisez le dossier avec <code>sc.textFile</code>
+et vérifiez le nombre de lignes. Comparez la taille du brut et des données propres (<code>hdfs dfs -du -s -h</code>).</li>
+<li>Vérifiez les deux équations de contrôle et présentez-les dans un tableau :
+<code>lignes du fichier = ignorées + rejetées + valides</code> et <code>valides = propres + doublons retirés</code>.</li>
+</ol></div>
+    </div>
+<h2 id="5-cache-persist-et-unpersist">5. Cache, persist et unpersist</h2>
+<p><code>propres</code> va servir à une vingtaine d'analyses, et chaque élément a demandé un appel à <code>analyser</code> puis un shuffle. C'est le cas d'école du cache.
+Pour chaque mesure de temps, faites <strong>deux</strong> exécutions et notez-les dans un tableau.</p>
+    <div class="box box-metier">
+      <strong>Question 11 : Sans cache</strong>
+      <div><ol type="a">
+<li>Affichez le lignage de <code>propres</code> : <code>print(propres.toDebugString().decode())</code>. Repérez la lecture du fichier, les transformations et le shuffle.</li>
+<li>Chronométrez trois actions : le nombre de ventes, le CA net total (<code>reduce</code>), le nombre de magasins distincts. Dans l'onglet <strong>Jobs</strong>, que refait chaque job ?
+Certains stages sont-ils <em>skipped</em> ? Pourquoi ?</li>
+</ol></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 12 : cache()</strong>
+      <div><ol type="a">
+<li>Appelez <code>propres.cache()</code>, puis affichez <code>propres.is_cached</code> et <code>propres.getStorageLevel()</code>. Qu'a-t-on calculé à ce stade ?</li>
+<li>Chronométrez <code>propres.count()</code> deux fois, puis le CA net total. Expliquez les trois temps.</li>
+<li>Onglet <strong>Storage</strong> : relevez le nom du RDD, le niveau de stockage, la <em>Fraction Cached</em> et la taille en mémoire. Réaffichez le lignage : qu'est-ce qui a changé ?</li>
+<li>Dans la visualisation du DAG (onglet Jobs, puis le job, puis <em>DAG Visualization</em>), comment repère-t-on le RDD en cache ? Faites une capture.</li>
+</ol></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 13 : persist(MEMORY_AND_DISK)</strong>
+      <div><ol type="a">
+<li>Si la <em>Fraction Cached</em> est inférieure à 100 %, expliquez pourquoi à l'aide de la configuration du TP5 (<code>spark.executor.memory</code>). Que se passe-t-il pour les partitions absentes du cache à chaque action ?</li>
+<li>Libérez le cache (<code>unpersist()</code>), vérifiez dans l'onglet Storage, puis remettez <code>propres</code> en cache avec <code>persist(StorageLevel.MEMORY_AND_DISK)</code>.
+Mesurez à nouveau. Relevez <em>Size in Memory</em> et <em>Size on Disk</em>.</li>
+<li>Quel niveau de stockage retenez-vous sur la VM, et pourquoi ? Dans quel cas <code>MEMORY_ONLY</code> serait-il le bon choix ?</li>
+</ol></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 14 : Un cycle de vie complet</strong>
+      <div><code>analysees</code> alimente deux RDD : <code>valides</code> et <code>rejets</code>.
+<ol type="a">
+<li>Mettez <code>analysees</code> en cache (<code>MEMORY_AND_DISK</code>), puis chronométrez <code>rejets.count()</code> et <code>valides.count()</code>. Comparez aux temps sans cache.</li>
+<li>Libérez <code>analysees</code>. Vérifiez dans l'onglet Storage que <code>propres</code> est toujours en cache. Pourquoi faut-il avoir <strong>matérialisé</strong> <code>propres</code>
+(par une action) avant de libérer son parent ?</li>
+</ol></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 15 : Réflexion sur le cache</strong>
+      <div><ol type="a">
+<li>Que se passe-t-il si l'on appelle <code>cache()</code> sur un RDD sans jamais lancer d'action ?</li>
+<li>Aurait-il été judicieux de mettre <code>lignes</code> (le fichier brut) en cache plutôt que <code>propres</code> ? Argumentez (taille, nombre d'utilisations, coût de recalcul).</li>
+<li>Pourquoi ne pas tout mettre en cache « par précaution » ? Citez deux inconvénients.</li>
+</ol></div>
+    </div>
+<h2 id="6-les-analyses-du-comite-de-direction">6. Les analyses du comité de direction</h2>
+<p>Toutes les analyses partent de <code>propres</code>, en cache. Pour chacune : le code, le résultat, et une phrase de <strong>lecture métier</strong>.
+Chaque résultat est enregistré dans <code>/teranga/resultats/</code>, sous le nom indiqué, en <strong>un seul fichier</strong> (pensez à <code>repartition(1)</code> pour
+les petits résultats) et au format texte <code>champ;champ;…</code>.</p>
+<div class="box box-info">Écrivez une petite fonction <code>sauver(rdd, nom)</code> qui met en forme chaque élément en ligne de texte et appelle <code>saveAsTextFile</code> :
+vous l'utiliserez à chaque question. Rappel : <code>saveAsTextFile</code> refuse d'écrire dans un dossier qui existe déjà (<code>hdfs dfs -rm -r</code>).</div>
+    <div class="box box-metier">
+      <strong>Question 16 : Les chiffres clés</strong>
+      <div>Calculez : le CA des ventes (quantités positives), le montant des retours, le CA net, le nombre de lignes de vente et le nombre de <strong>tickets</strong> distincts.
+<div class="save">pas d'enregistrement</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 17 : CA net par magasin</strong>
+      <div>Calculez le CA net de chaque magasin, trié par ordre décroissant (<code>sortBy</code>).
+<div class="save">→ resultats/q17_ca_magasin</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 18 : CA net par région</strong>
+      <div><ol type="a">
+<li>Chargez le référentiel <code>magasins.csv</code> en RDD de paires <code>(magasin, région)</code> et calculez le CA net par région avec <code>join</code>.</li>
+<li>Le total des régions est-il égal au CA net de la question 16 ? Retrouvez le magasin manquant avec <code>leftOuterJoin</code>. Quelle décision de gestion proposez-vous ?</li>
+<li>La jointure provoque-t-elle un shuffle ? Combien de stages compte le job ?</li>
+</ol><div class="save">→ resultats/q18_ca_region</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 19 : CA net mensuel</strong>
+      <div>Calculez le CA net de chaque mois (<code>2025-01</code> à <code>2025-12</code>), trié par mois. Repérez les mois de pic et proposez une explication
+liée au calendrier sénégalais de 2025.
+<div class="save">→ resultats/q19_ca_mois</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 20 : L'effet Tabaski</strong>
+      <div>La Tabaski 2025 a eu lieu le 6 juin. Pour les rayons Alimentation et Textile, comparez le <strong>CA moyen par jour</strong> pendant les dix jours qui précèdent
+la fête (du 28 mai au 6 juin inclus) au CA moyen par jour du reste du mois de mai. Donnez le rapport entre les deux. Indice : agrégez d'abord par jour, puis faites la moyenne
+des jours.
+<div class="save">pas d'enregistrement</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 21 : Les produits phares</strong>
+      <div>Donnez le top 10 des produits par CA net, puis le top 10 par quantité vendue (<code>takeOrdered</code>). Pourquoi les deux classements diffèrent-ils ?
+Quelle conséquence pour la gestion des stocks et pour le trafic en magasin ?
+<div class="save">→ resultats/q21_produits (tous les produits : produit;CA;quantité, triés par CA)</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 22 : Les moyens de paiement</strong>
+      <div><ol type="a">
+<li>Calculez la part (en %) de chaque moyen de paiement dans le CA net de l'enseigne.</li>
+<li>Pour chaque magasin, calculez la part du <strong>mobile money</strong> (Wave, Orange Money, Free Money) dans son CA net, triée par ordre décroissant.
+Quelle lecture en faites-vous pour la gestion des fonds de caisse et du transport de fonds ?</li>
+</ol><div class="save">→ resultats/q22_mobile_money_magasin</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 23 : Le panier moyen</strong>
+      <div>Pour chaque magasin, calculez le <strong>panier moyen</strong> (CA moyen d'un ticket) et le nombre moyen d'articles par ticket (somme des quantités en valeur absolue).
+Expliquez pourquoi deux agrégations successives sont nécessaires, et ce que donnerait une moyenne calculée directement sur les lignes.
+<div class="save">→ resultats/q23_panier_moyen</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 24 : Le plus gros ticket</strong>
+      <div>Quel est le ticket de l'année au montant le plus élevé (identifiant, magasin, montant, nombre d'articles) ?
+<div class="save">pas d'enregistrement</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 25 : Les retours</strong>
+      <div><ol type="a">
+<li>Pour chaque catégorie, calculez le taux de retour : montant retourné rapporté au CA des ventes, en %.</li>
+<li>Quels sont les trois produits les plus retournés, en unités ?</li>
+</ol><div class="save">→ resultats/q25_taux_retour</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 26 : La carte de fidélité</strong>
+      <div>Calculez la part du CA net réalisée avec une carte de fidélité, le nombre de clients distincts, le CA moyen par client, le top 10 des clients
+et le poids de ce top 10 dans le CA des clients fidèles. Le programme de fidélité est-il concentré sur quelques gros clients ?
+<div class="save">→ resultats/q26_ca_clients (tous les clients, triés par CA)</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 27 : Les heures de pointe à Dakar</strong>
+      <div>Pour le magasin de Dakar, calculez le nombre de <strong>tickets</strong> (et non de lignes) par heure d'ouverture (08 à 21), trié par heure.
+À quoi ce résultat sert-il pour la gestion du personnel ?
+<div class="save">→ resultats/q27_heures_dakar</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 28 : Le jour de la semaine</strong>
+      <div>Calculez le CA net par jour de la semaine, présenté de lundi à dimanche. Indice : <code>dt.date.fromisoformat(d).weekday()</code> renvoie 0 pour lundi.
+<div class="save">→ resultats/q28_jours</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 29 : La saison de l'électroménager</strong>
+      <div>Calculez le CA net mensuel du rayon Électroménager. Que constatez-vous ? Quelle recommandation feriez-vous à la centrale d'achat ?
+<div class="save">→ resultats/q29_electromenager</div></div>
+    </div>
+<h2 id="7-enquete-sur-la-qualite-des-donnees">7. Enquête sur la qualité des données</h2>
+<p>Les anomalies corrigées à la section 4 ne sont peut-être pas réparties au hasard. Si elles viennent de quelques caisses, mieux vaut les corriger <strong>à la source</strong>.</p>
+    <div class="box box-metier">
+      <strong>Question 30 : D'où viennent les anomalies ?</strong>
+      <div>À partir de <code>valides</code> (qui contient la liste des corrections de chaque ligne) :
+<ol type="a">
+<li>calculez, pour chaque magasin, le pourcentage de ses lignes qui ont nécessité les corrections <code>date_jj/mm/aaaa</code>, <code>prix_FCFA</code> et <code>prix_virgule</code>
+(indice : <code>flatMap</code> pour produire une paire par correction, puis une jointure avec le nombre de lignes par magasin) ;</li>
+<li>calculez la part des prix à virgule pour chaque mois ;</li>
+<li>calculez le nombre de doublons par couple (magasin, mois) et affichez les cinq plus élevés.</li>
+</ol>
+Rédigez une <strong>note au DSI</strong> d'une dizaine de lignes : quelles caisses ou quelles périodes posent problème, quelle est la cause probable, quelle correction demander.
+<div class="save">→ resultats/q30_corrections_magasin</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 31 : Pour aller plus loin : des prix incohérents</strong>
+      <div>Un prix saisi en centimes (multiplié par 100) pour un produit bon marché reste sous le seuil de 100 000 FCFA et n'a donc pas été rejeté.
+Calculez le prix moyen de chaque produit, puis listez les ventes dont le prix dépasse trois fois le prix moyen de leur produit (indice : <code>join</code>).
+Combien en trouvez-vous ? Quelle hypothèse formulez-vous ? Pourquoi une règle globale (un seul seuil pour tous les produits) ne suffisait-elle pas ?
+<div class="save">→ resultats/q31_prix_suspects</div></div>
+    </div>
+<p>En fin de séance, libérez le cache (<code>propres.unpersist()</code>) et vérifiez que l'onglet Storage est vide.</p>
+<h2 id="8-livrable-attendu">8. Livrable attendu et barème indicatif</h2>
+<ul>
+  <li>Votre <strong>notebook</strong> (ou script) exécuté, des sections 3 à 7.</li>
+  <li>Un <strong>rapport</strong> (PDF) : réponses aux questions, tableaux de mesures, captures de l'interface 4040 (DAG avec cache, onglet Storage en
+    <code>MEMORY_ONLY</code> et en <code>MEMORY_AND_DISK</code>), et la note au DSI.</li>
+  <li>La sortie de <code>hdfs dfs -ls -R /teranga/resultats</code> et les premières lignes de deux fichiers de résultats (<code>hdfs dfs -cat … | head</code>).</li>
+</ul>
+<table>
+  <thead><tr><th>Section</th><th>Questions</th><th>Points</th></tr></thead>
+  <tbody>
+    <tr><td>3. Explorer le fichier brut</td><td>Q1 à Q6</td><td>3</td></tr>
+    <tr><td>4. Nettoyer</td><td>Q7 à Q10</td><td>5</td></tr>
+    <tr><td>5. Cache, persist et unpersist</td><td>Q11 à Q15</td><td>4</td></tr>
+    <tr><td>6. Les analyses</td><td>Q16 à Q29</td><td>6</td></tr>
+    <tr><td>7. Qualité des données et note au DSI</td><td>Q30 (Q31 en bonus)</td><td>2</td></tr>
+  </tbody>
+</table>
 <h2 id="annexes">Annexes</h2>
-    <h3>Annexe A — Interfaces web</h3>
-    <table>
-      <thead><tr><th>Service</th><th>Adresse depuis votre poste</th></tr></thead>
-      <tbody>
-        <tr><td>Application Spark en cours (driver)</td><td><code>http://192.168.56.10:4040</code></td></tr>
-        <tr><td>Historique Spark</td><td><code>http://192.168.56.10:18080</code></td></tr>
-        <tr><td>YARN ResourceManager</td><td><code>http://192.168.56.10:8088</code></td></tr>
-        <tr><td>HDFS NameNode</td><td><code>http://192.168.56.10:9870</code></td></tr>
-        <tr><td>NodeManager d'un worker</td><td><code>http://192.168.56.11:8042</code> (12, 13)</td></tr>
-      </tbody>
-    </table>
-    <h3>Annexe B — Récapitulatif de la mémoire</h3>
-    <table>
-      <thead><tr><th>Élément</th><th>Demandé</th><th>Conteneur YARN</th><th>Où</th></tr></thead>
-      <tbody>
-        <tr><td>Driver (mode client)</td><td>512 Mo</td><td>hors YARN</td><td>master</td></tr>
-        <tr><td>ApplicationMaster</td><td>512 Mo</td><td>1 024 Mo</td><td>un worker</td></tr>
-        <tr><td>Executor (× 3)</td><td>1 024 Mo</td><td>1 536 Mo</td><td>un par worker</td></tr>
-        <tr><td>Capacité YARN par worker</td><td colspan="2">2 560 Mo</td><td>datanode1 à 3</td></tr>
-      </tbody>
-    </table>
-    <h3>Annexe C — Commandes utiles</h3>
-    <table>
-      <thead><tr><th>Commande</th><th>Description</th></tr></thead>
-      <tbody>
-        <tr><td><code>yarn node -list</code></td><td>NodeManagers actifs et leur état</td></tr>
-        <tr><td><code>yarn application -list</code></td><td>Applications en cours (Spark et MapReduce)</td></tr>
-        <tr><td><code>yarn --daemon stop|start nodemanager</code></td><td>Arrêter ou relancer le NodeManager d'un worker</td></tr>
-        <tr><td><code>hdfs fsck &lt;fichier&gt; -files -blocks -locations</code></td><td>Blocs d'un fichier et DataNodes qui les détiennent</td></tr>
-        <tr><td><code>hdfs dfs -D dfs.replication=1 -put …</code></td><td>Déposer un fichier avec une seule copie</td></tr>
-        <tr><td><code>ssh datanode1 jps</code></td><td>Processus Java d'un worker, depuis master</td></tr>
-      </tbody>
-    </table>
-    <div class="box box-success">
-      <strong>Félicitations !</strong> Votre cluster fait tourner deux moteurs sur trois workers, et vous avez vu Spark survivre à la perte d'une machine :
-      c'est le quotidien d'une plateforme Big Data en entreprise.
-    </div>
-<div class="pager"><a class="prev" href="tp5.html"><small>← Précédent</small>TP5 — Spark sur la VM du TP1</a><a class="next" href="tp7.html"><small>Suivant →</small>TP7 — DataFrames et Spark SQL</a></div>
+<h3>Annexe A. Aide-mémoire du chapitre 6</h3>
+<table>
+  <thead><tr><th>Opération</th><th>Type</th><th>Rôle</th></tr></thead>
+  <tbody>
+    <tr><td><code>map(f)</code>, <code>filter(f)</code>, <code>flatMap(f)</code></td><td>transformation étroite</td><td>1 → 1, 1 → 0 ou 1, 1 → 0 à n</td></tr>
+    <tr><td><code>mapValues(f)</code></td><td>transformation étroite</td><td>applique f à la valeur d'une paire, garde la clé</td></tr>
+    <tr><td><code>union(rdd2)</code></td><td>transformation étroite</td><td>concatène deux RDD</td></tr>
+    <tr><td><code>reduceByKey(f)</code></td><td>transformation large</td><td>agrège par clé, avec pré-agrégation locale</td></tr>
+    <tr><td><code>groupByKey()</code></td><td>transformation large</td><td>regroupe toutes les valeurs d'une clé (tout transite)</td></tr>
+    <tr><td><code>distinct()</code>, <code>sortBy(f)</code></td><td>transformation large</td><td>dédoublonne ; trie</td></tr>
+    <tr><td><code>join(rdd2)</code>, <code>leftOuterJoin(rdd2)</code></td><td>transformation large</td><td>jointure interne ; jointure qui garde toutes les clés de gauche (<code>None</code> si absente à droite)</td></tr>
+    <tr><td><code>repartition(n)</code></td><td>transformation large</td><td>redistribue en n partitions</td></tr>
+    <tr><td><code>count()</code>, <code>first()</code>, <code>take(n)</code></td><td>action</td><td>compter ; inspecter sans risque</td></tr>
+    <tr><td><code>reduce(f)</code></td><td>action</td><td>agrège tout le RDD en une valeur</td></tr>
+    <tr><td><code>takeOrdered(n, key=…)</code></td><td>action</td><td>top-N sans tri complet</td></tr>
+    <tr><td><code>countByKey()</code></td><td>action</td><td>dictionnaire clé → nombre, au driver</td></tr>
+    <tr><td><code>collect()</code></td><td>action</td><td>tout le RDD au driver : petits résultats seulement</td></tr>
+    <tr><td><code>saveAsTextFile(chemin)</code></td><td>action</td><td>écrit un fichier <code>part-…</code> par partition</td></tr>
+    <tr><td><code>cache()</code>, <code>persist(niveau)</code></td><td>marquage (paresseux)</td><td>garde le RDD à la première action ; <code>cache()</code> = <code>MEMORY_ONLY</code></td></tr>
+    <tr><td><code>unpersist()</code></td><td>immédiat</td><td>libère le cache</td></tr>
+    <tr><td><code>is_cached</code>, <code>getStorageLevel()</code>, <code>toDebugString()</code>, <code>getNumPartitions()</code></td><td>information</td><td>état du cache, niveau de stockage, lignage, nombre de partitions</td></tr>
+    <tr><td><code>keys()</code>, <code>values()</code></td><td>transformation étroite</td><td>la clé ou la valeur de chaque paire</td></tr>
+  </tbody>
+</table>
+<h3>Annexe B. Erreurs fréquentes</h3>
+<table>
+  <thead><tr><th>Symptôme</th><th>Cause</th><th>Solution</th></tr></thead>
+  <tbody>
+    <tr><td><em>Output directory … already exists</em></td><td>le dossier de sortie existe</td><td><code>hdfs dfs -rm -r /teranga/resultats/qNN_…</code></td></tr>
+    <tr><td>Job en échec : <em>ValueError</em>, <em>IndexError</em> dans les journaux d'un executor</td><td>une lambda a levé une exception sur une ligne inattendue</td><td>protéger le code dans <code>analyser</code> (<code>try</code> / <code>except</code>), tester sur <code>take(…)</code></td></tr>
+    <tr><td><em>OutOfMemoryError</em> ou shell figé après un <code>collect()</code></td><td>trop de données rapatriées au driver</td><td><code>take</code>, <code>takeOrdered</code>, ou écrire le résultat</td></tr>
+    <tr><td>Résultats faux, sans erreur</td><td>clé mal normalisée (espaces, accents), ou ligne d'en-tête comptée</td><td>vérifier sur un petit échantillon, relire les équations de contrôle (Q10)</td></tr>
+    <tr><td>L'application reste en état ACCEPTED</td><td>un autre shell ou notebook occupe les conteneurs YARN</td><td>le fermer, ou <code>yarn application -kill &lt;id&gt;</code></td></tr>
+  </tbody>
+</table>
+<div class="pager"><a class="prev" href="tp5.html"><small>← Précédent</small>TP5 : Spark sur la VM du TP1</a><a class="next" href="tp7.html"><small>Suivant →</small>TP7 : Spark sur le cluster du TP2</a></div>
   </main>
 </div>
 <footer class="site-footer">ISI — Institut Supérieur d'Informatique · Master 1 — IAGE · Big Data &amp; Analyse de données · Année universitaire 2026-2027</footer>
@@ -521,6 +534,7 @@ stop-dfs.sh
     });
   }
 </script>
+
 
 
 </body>
