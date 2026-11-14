@@ -45,11 +45,11 @@
       <p class="eyebrow">Travaux pratiques n°6 · Big Data &amp; Analyse de données</p>
       <h1>Nettoyer et analyser les ventes de Teranga Distrib avec les RDD</h1>
       <p class="lead">Un export de caisses réel, imparfait : le fiabiliser avec Spark, maîtriser le cache, puis produire les indicateurs du comité de direction.</p>
-      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Spark 4.2.0</span><span class="chip">RDD</span><span class="chip">VM du TP5</span><span class="chip">2 séances de 3 h</span><span class="chip">Novembre 2026</span></div>
+      <div class="chips"><span class="chip"><b>Master 1 — IAGE</b></span><span class="chip">Année 2026-2027</span><span class="chip">Spark 4.2.0</span><span class="chip">RDD</span><span class="chip">VM du TP5</span><span class="chip">MapReduce</span><span class="chip">3 séances de 3 h</span><span class="chip">Novembre 2026</span></div>
     </div>
   </div>
 </header>
-<section class="brief" aria-label="Fiche du TP"><div class="card"><h3>Objectif</h3><p>Nettoyer un fichier de plus d'un million de lignes plein d'anomalies, puis répondre à une trentaine de questions d'analyse, uniquement avec des RDD.</p></div><div class="card"><h3>Lien avec le cours</h3><p>Chapitre 6 : transformations étroites et larges, actions, paires clé/valeur, jointures, DAG, cache, persist, unpersist, saveAsTextFile.</p></div><div class="card metier"><h3>Enjeu métier (IAGE)</h3><p>Un indicateur calculé sur des données sales est faux. Fiabiliser la donnée, tracer les rejets et remonter les causes au DSI fait partie du métier de contrôleur de gestion.</p></div></section>
+<section class="brief" aria-label="Fiche du TP"><div class="card"><h3>Objectif</h3><p>Nettoyer un fichier de plus d'un million de lignes plein d'anomalies, puis répondre à une trentaine de questions d'analyse, uniquement avec des RDD.</p></div><div class="card"><h3>Lien avec le cours</h3><p>Chapitre 6 : transformations étroites et larges, actions, paires clé/valeur, jointures, DAG, cache, persist, unpersist, saveAsTextFile. Chapitre 4 : MapReduce en Hadoop Streaming, revu sur les données propres.</p></div><div class="card metier"><h3>Enjeu métier (IAGE)</h3><p>Un indicateur calculé sur des données sales est faux. Fiabiliser la donnée, tracer les rejets et remonter les causes au DSI fait partie du métier de contrôleur de gestion.</p></div></section>
 <div class="doc-layout">
   <nav class="toc card" aria-label="Sommaire"><h2>Sommaire</h2><ol></ol></nav>
   <main class="doc">
@@ -62,7 +62,8 @@ deux fois. Avant toute analyse, il faut <strong>nettoyer</strong> les données, 
 Le fichier est assez gros pour que l'usage du <strong>cache</strong> fasse une différence mesurable.</p>
 <div class="box box-warning"><strong>Règles du TP.</strong>
 <ul>
-  <li>On travaille <strong>exclusivement avec l'API RDD</strong> du chapitre 6 (<code>sc.textFile</code>, <code>map</code>, <code>filter</code>, <code>reduceByKey</code>, <code>join</code>…).</li>
+  <li>Des sections 3 à 7, on travaille <strong>exclusivement avec l'API RDD</strong> du chapitre 6 (<code>sc.textFile</code>, <code>map</code>, <code>filter</code>, <code>reduceByKey</code>, <code>join</code>…).
+    La section 8 revient sur <strong>MapReduce</strong> (chapitre 4), sur les données nettoyées par Spark.</li>
   <li><code>collect()</code> est interdit sur un RDD de plus de quelques centaines d'éléments : utilisez <code>take</code>, <code>takeOrdered</code>, <code>count</code>, ou écrivez le résultat.</li>
   <li>Chaque analyse de la section 6 est <strong>enregistrée dans HDFS</strong> avec <code>saveAsTextFile</code>.</li>
   <li>Pour chaque question, gardez le code, le résultat et une phrase d'explication : ils constituent le rapport.</li>
@@ -460,23 +461,158 @@ Combien en trouvez-vous ? Quelle hypothèse formulez-vous ? Pourquoi une règle 
 <div class="save">→ resultats/q31_prix_suspects</div></div>
     </div>
 <p>En fin de séance, libérez le cache (<code>propres.unpersist()</code>) et vérifiez que l'onglet Storage est vide.</p>
-<h2 id="8-livrable-attendu">8. Livrable attendu et barème indicatif</h2>
+<h2 id="8-revoir-hadoop-mapreduce">8. Revoir Hadoop : des analyses MapReduce sur les données propres</h2>
+<p>Les données nettoyées par Spark à la question 10 sont dans HDFS (<code>/teranga/propres</code>). On revient au <strong>chapitre 4</strong> : plusieurs
+indicateurs de la section 6 sont recalculés en <strong>MapReduce</strong>, avec Hadoop Streaming et des scripts Python, sur la même VM et le même HDFS.
+Vous pourrez ainsi comparer les deux moteurs sur des résultats que vous connaissez déjà.</p>
+<div class="box box-info"><strong>Format de l'entrée.</strong> Chaque ligne de <code>/teranga/propres</code> est une vente propre, au format de la question 10 :
+11 champs séparés par <code>;</code>, dans l'ordre <code>id_vente;id_ticket;date;heure;magasin;categorie;produit;quantite;prix_unitaire;paiement;id_client</code>.
+La quantité est un entier, le prix un nombre décimal (<code>575.0</code>), la date est au format <code>aaaa-mm-jj</code>.</div>
+<h3>Méthode : un petit fichier de test, puis les vraies données</h3>
+<p>Un job sur un million de lignes est long à relancer, et une erreur y est difficile à repérer. Pour chaque question, vous lancez donc d'abord le job
+<strong>sur YARN</strong> avec un petit fichier de 14 ventes propres, dont vous pouvez <strong>calculer le résultat à la main</strong>. Ce n'est que lorsque
+le résultat est juste que vous relancez le job sur <code>/teranga/propres</code>.</p>
+<p>Le fichier de test reprend le format des données propres. Il contient 8 tickets dans 4 magasins (dont Rufisque), un retour et trois mois différents.
+Créez-le une fois pour toutes, puis déposez-le dans HDFS :</p>
+<pre>mkdir -p ~/mr &amp;&amp; cd ~/mr
+cat &gt; extrait.txt &lt;&lt; 'EOF'
+V90000001;T9000001;2025-04-12;12:15;Dakar;Électroménager;Ventilateur;1;25000.0;Wave;C00042
+V90000002;T9000001;2025-04-12;12:15;Dakar;Boissons;Eau minérale 1,5 L;2;400.0;Wave;C00042
+V90000003;T9000002;2025-05-03;18:40;Dakar;Alimentation;Riz brisé 25 kg;1;17500.0;Espèces;
+V90000004;T9000002;2025-05-03;18:40;Dakar;Alimentation;Sucre 1 kg;3;700.0;Espèces;
+V90000005;T9000003;2025-05-03;19:05;Dakar;Alimentation;Huile 5 L;1;7500.0;Orange Money;C00007
+V90000006;T9000004;2025-04-20;10:30;Thiès;Alimentation;Riz brisé 25 kg;2;17500.0;Espèces;
+V90000007;T9000004;2025-04-20;10:30;Thiès;Hygiène;Savon de Marseille;4;300.0;Espèces;
+V90000008;T9000004;2025-04-20;10:30;Thiès;Hygiène;Savon de Marseille;-1;300.0;Espèces;
+V90000009;T9000005;2025-06-01;17:10;Thiès;Textile;Pagne wax 6 yards;2;6000.0;Wave;C00113
+V90000010;T9000006;2025-04-25;11:00;Mbour;Électroménager;Mixeur;1;18000.0;Carte bancaire;
+V90000011;T9000006;2025-04-25;11:00;Mbour;Boissons;Bissap 1 L;2;1000.0;Carte bancaire;
+V90000012;T9000007;2025-05-15;13:00;Rufisque;Alimentation;Lait en poudre 400 g;2;2500.0;Free Money;C00042
+V90000013;T9000007;2025-05-15;13:00;Rufisque;Alimentation;Café Touba 250 g;1;1000.0;Free Money;C00042
+V90000014;T9000008;2025-05-15;13:20;Rufisque;Électroménager;Bouilloire;1;12000.0;Carte bancaire;
+EOF
+hdfs dfs -mkdir -p /teranga/test /teranga/mr /teranga/mr_test
+hdfs dfs -put -f extrait.txt /teranga/test/
+hdfs dfs -cat /teranga/test/extrait.txt
+</pre>
+<p>Pour chaque question, en trois temps :</p>
+<ol>
+  <li><strong>Calculez à la main</strong>, sur les 14 lignes du fichier de test, le résultat attendu.</li>
+  <li><strong>Lancez le job sur le fichier de test</strong> (sortie dans <code>/teranga/mr_test/</code>) et comparez avec votre calcul.</li>
+  <li><strong>Relancez le même job sur les données propres</strong> (sortie dans <code>/teranga/mr/</code>, sous le nom indiqué).</li>
+</ol>
+<p>Exemple avec la question 32 :</p>
+<pre>cd ~/mr
+STREAM=$(ls $HADOOP_HOME/share/hadoop/tools/lib/hadoop-streaming-*.jar)
+
+# Sur le fichier de test : quelques secondes
+hadoop jar $STREAM -D mapreduce.job.name="TP6 Q32 - test" \
+  -files mapper.py,reducer.py \
+  -mapper "python3 mapper.py" -reducer "python3 reducer.py" \
+  -input /teranga/test/extrait.txt -output /teranga/mr_test/q32
+hdfs dfs -cat /teranga/mr_test/q32/part-*
+
+# Sur les données propres
+hadoop jar $STREAM -D mapreduce.job.name="TP6 Q32 - CA par magasin" \
+  -files mapper.py,reducer.py \
+  -mapper "python3 mapper.py" -reducer "python3 reducer.py" \
+  -input /teranga/propres -output /teranga/mr/q32_ca_magasin
+hdfs dfs -cat /teranga/mr/q32_ca_magasin/part-*
+</pre>
+<p>Sur le fichier de test, le job de la question 32 doit afficher exactement :</p>
+<pre class="plain">Dakar        52900
+Mbour        20000
+Rufisque     18000
+Thiès        47900</pre>
+<div class="box box-info">Pour la question 35, ajoutez le référentiel comme seconde entrée, y compris pour le test :
+<code>-input /teranga/test/extrait.txt -input /teranga/ref/magasins.csv</code>. Pour les jobs enchaînés (questions 34, 35 et 36), le second job du test
+lit la sortie du premier job du test, dans <code>/teranga/mr_test/</code>.</div>
+<div class="box box-warning">Comme pour <code>saveAsTextFile</code>, un job refuse d'écrire dans un dossier existant : <code>hdfs dfs -rm -r -f /teranga/mr/qNN_…</code>.
+Fermez aussi votre session Spark (ou le noyau du notebook) avant de lancer un job : sur la VM, YARN n'a pas assez de mémoire pour les deux à la fois.</div>
+    <div class="box box-metier">
+      <strong>Question 32 : Un premier job : le CA net par magasin</strong>
+      <div><ol type="a">
+<li>Écrivez le mapper (clé : le magasin ; valeur : le montant de la ligne) et le reducer (somme des valeurs d'une clé, reçues triées). Lancez le job sur le fichier de test et vérifiez le résultat ci-dessus, puis lancez-le sur les données propres.</li>
+<li>Combien de tâches map le job a-t-il lancées (compteur <em>Launched map tasks</em> dans le bilan du job, ou page du job sur le port 8088) ? Reliez ce nombre aux fichiers
+<code>part-…</code> de <code>/teranga/propres</code>, donc aux partitions du RDD écrit par Spark.</li>
+<li>Relevez dans le bilan les compteurs <em>Map input records</em>, <em>Map output records</em>, <em>Reduce input groups</em> et <em>Reduce output records</em>. Expliquez chaque valeur.</li>
+<li>Vérifiez que vous retrouvez exactement le résultat de la question 17 (<code>resultats/q17_ca_magasin</code>).</li>
+</ol><div class="save">→ mr/q32_ca_magasin</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 33 : Une clé composée et plusieurs reducers</strong>
+      <div>Calculez le CA net par magasin <strong>et</strong> par mois avec une clé composée <code>magasin|mois</code>, en lançant le job avec
+<code>-numReduceTasks 3</code>.
+<ol type="a">
+<li>Combien de fichiers de sortie obtenez-vous ? Quelles clés contient chacun ? Chaque fichier est-il trié ? La sortie dans son ensemble l'est-elle ?</li>
+<li>Qu'est-ce qui décide du reducer qui reçoit une clé donnée ? Les douze mois d'un même magasin sont-ils dans le même fichier ? Pourquoi ?</li>
+</ol><div class="save">→ mr/q33_ca_magasin_mois</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 34 : Le panier moyen : deux jobs enchaînés</strong>
+      <div>Recalculez le panier moyen par magasin (question 23).
+<ol type="a">
+<li>Pourquoi un seul job ne suffit-il pas ? Proposez deux jobs : le premier calcule le montant de chaque ticket, le second la moyenne par magasin à partir de la sortie du premier.</li>
+<li>Combien de lignes contient la sortie du premier job ? Comparez au nombre de tickets de la question 16.</li>
+<li>Vos paniers moyens sont-ils ceux de la question 23 ?</li>
+<li>Qu'est-ce qui a été écrit dans HDFS entre les deux jobs ? Qu'aurait fait Spark à la place ?</li>
+</ol><div class="save">→ mr/q34_tickets (job 1), mr/q34_panier_moyen (job 2)</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 35 : Le CA par région : une jointure en MapReduce</strong>
+      <div>Recalculez le CA net par région (question 18) en joignant les ventes propres et <code>magasins.csv</code>.
+<ol type="a">
+<li>Un job peut recevoir plusieurs entrées : répétez l'option <code>-input</code> (<code>/teranga/propres</code> et <code>/teranga/ref/magasins.csv</code>).
+Comment le mapper reconnaît-il l'origine d'une ligne ? Faites-lui émettre des valeurs <strong>étiquetées</strong> (par exemple <code>R;Dakar</code> pour une région,
+<code>V;12500.0</code> pour une vente), avec le magasin comme clé.</li>
+<li>Dans le reducer, les valeurs d'un magasin arrivent dans un ordre quelconque : pourquoi faut-il attendre la fin du groupe pour écrire le résultat ?</li>
+<li>Que devient Rufisque ? Comparez au comportement de <code>join</code> et de <code>leftOuterJoin</code> à la question 18.</li>
+<li>Le premier job donne un CA par magasin, avec sa région. Ajoutez un second job pour obtenir le CA par région.</li>
+</ol><div class="save">→ mr/q35_jointure (job 1), mr/q35_ca_region (job 2)</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 36 : Le top 10 des produits</strong>
+      <div>Recalculez le top 10 des produits par CA net (question 21) en deux jobs : la somme par produit, puis le classement.
+<ol type="a">
+<li>Pour le second job, pourquoi faut-il <code>-numReduceTasks 1</code> ? Que se passerait-il avec trois reducers ?</li>
+<li>Quelle limite cette méthode aurait-elle s'il y avait des millions de produits ? À quelle action Spark correspond ce second job ?</li>
+</ol><div class="save">→ mr/q36_produits (job 1), mr/q36_top10 (job 2)</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 37 : La part du mobile money</strong>
+      <div>Recalculez la part du mobile money dans le CA de chaque magasin (question 22 b) en <strong>un seul job</strong> : la valeur émise par le mapper
+contient deux nombres (le montant payé en mobile money, nul sinon, et le montant total).
+Pourquoi le pourcentage doit-il être calculé dans le reducer, et pas dans le mapper ?
+<div class="save">→ mr/q37_mobile_money</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 38 : Un job sans reducer</strong>
+      <div>Extrayez toutes les ventes d'électroménager d'avril et de mai, telles quelles, avec un job lancé avec <code>-numReduceTasks 0</code>
+(le mapper écrit la ligne entière ou rien).
+<ol type="a">
+<li>Combien de fichiers de sortie obtenez-vous, et comment s'appellent-ils ? Pourquoi ?</li>
+<li>La sortie est-elle triée ? Y a-t-il eu un shuffle ? Que gagne-t-on à se passer de reducer ?</li>
+<li>Combien de lignes avez-vous extraites ? Vérifiez avec un <code>filter</code> puis un <code>count</code> en Spark.</li>
+</ol><div class="save">→ mr/q38_electro_avril_mai</div></div>
+    </div>
+    <div class="box box-metier">
+      <strong>Question 39 : Bilan : MapReduce ou Spark ?</strong>
+      <div>Pour le panier moyen (Q34 contre Q23) et le CA par région (Q35 contre Q18), remplissez le tableau suivant, puis concluez en quelques lignes :
+qu'est-ce que Spark a gardé de Hadoop, et qu'est-ce qu'il a remplacé ?
+<table><thead><tr><th>Critère</th><th>MapReduce</th><th>Spark (RDD)</th></tr></thead><tbody>
+<tr><td>Nombre de jobs</td><td></td><td></td></tr>
+<tr><td>Données intermédiaires écrites dans HDFS</td><td></td><td></td></tr>
+<tr><td>Lignes de code</td><td></td><td></td></tr>
+<tr><td>Temps total (page du job sur le port 8088, ou interface 4040)</td><td></td><td></td></tr>
+</tbody></table></div>
+    </div>
+<h2 id="9-livrable-attendu">9. Livrable attendu</h2>
 <ul>
-  <li>Votre <strong>notebook</strong> (ou script) exécuté, des sections 3 à 7.</li>
+  <li>Votre <strong>notebook</strong> (ou script) exécuté, des sections 3 à 7, et vos <strong>scripts MapReduce</strong> (mappers et reducers) de la section 8.</li>
   <li>Un <strong>rapport</strong> (PDF) : réponses aux questions, tableaux de mesures, captures de l'interface 4040 (DAG avec cache, onglet Storage en
     <code>MEMORY_ONLY</code> et en <code>MEMORY_AND_DISK</code>), et la note au DSI.</li>
-  <li>La sortie de <code>hdfs dfs -ls -R /teranga/resultats</code> et les premières lignes de deux fichiers de résultats (<code>hdfs dfs -cat … | head</code>).</li>
+  <li>La sortie de <code>hdfs dfs -ls -R /teranga/resultats /teranga/mr</code> et les premières lignes de deux fichiers de résultats (<code>hdfs dfs -cat … | head</code>).</li>
 </ul>
-<table>
-  <thead><tr><th>Section</th><th>Questions</th><th>Points</th></tr></thead>
-  <tbody>
-    <tr><td>3. Explorer le fichier brut</td><td>Q1 à Q6</td><td>3</td></tr>
-    <tr><td>4. Nettoyer</td><td>Q7 à Q10</td><td>5</td></tr>
-    <tr><td>5. Cache, persist et unpersist</td><td>Q11 à Q15</td><td>4</td></tr>
-    <tr><td>6. Les analyses</td><td>Q16 à Q29</td><td>6</td></tr>
-    <tr><td>7. Qualité des données et note au DSI</td><td>Q30 (Q31 en bonus)</td><td>2</td></tr>
-  </tbody>
-</table>
 <h2 id="annexes">Annexes</h2>
 <h3>Annexe A. Aide-mémoire du chapitre 6</h3>
 <table>
@@ -510,6 +646,8 @@ Combien en trouvez-vous ? Quelle hypothèse formulez-vous ? Pourquoi une règle 
     <tr><td>Job en échec : <em>ValueError</em>, <em>IndexError</em> dans les journaux d'un executor</td><td>une lambda a levé une exception sur une ligne inattendue</td><td>protéger le code dans <code>analyser</code> (<code>try</code> / <code>except</code>), tester sur <code>take(…)</code></td></tr>
     <tr><td><em>OutOfMemoryError</em> ou shell figé après un <code>collect()</code></td><td>trop de données rapatriées au driver</td><td><code>take</code>, <code>takeOrdered</code>, ou écrire le résultat</td></tr>
     <tr><td>Résultats faux, sans erreur</td><td>clé mal normalisée (espaces, accents), ou ligne d'en-tête comptée</td><td>vérifier sur un petit échantillon, relire les équations de contrôle (Q10)</td></tr>
+    <tr><td>Job MapReduce en échec : <em>PipeMapRed.waitOutputThreads(): subprocess failed with code 1</em></td><td>le script Python a levé une exception</td><td>lancer d'abord le job sur le fichier de test ; lire les journaux de la tâche en échec dans YARN (port 8088, puis le job, puis la tâche, puis <em>logs</em>)</td></tr>
+    <tr><td>Job MapReduce : <em>Output directory … already exists</em></td><td>le dossier de sortie existe</td><td><code>hdfs dfs -rm -r -f /teranga/mr/qNN_…</code></td></tr>
     <tr><td>L'application reste en état ACCEPTED</td><td>un autre shell ou notebook occupe les conteneurs YARN</td><td>le fermer, ou <code>yarn application -kill &lt;id&gt;</code></td></tr>
   </tbody>
 </table>
